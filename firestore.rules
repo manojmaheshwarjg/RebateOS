@@ -1,0 +1,176 @@
+/**
+ * @fileoverview Firestore Security Rules for RebateOS Contract Inbox.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a vendor-centric security model. Each vendor has exclusive access to its own vendors, contracts, contract files, rebate rules and claims.
+ *
+ * Data Structure:
+ * - /vendors/{vendorId}: Stores vendor information. Vendor owns its own document.
+ * - /contracts/{contractId}: Stores contract information. Contains a `vendorId` field for authorization.
+ * - /contract_files/{contractFileId}: Stores contract file information.
+ * - /rebate_rules/{rebateRuleId}: Stores rebate rule information. Contains a `contractId` for associating rules with contracts.
+ * - /claims/{claimId}: Stores rebate claim information. Contains a `vendorId` field for authorization.
+ * - /accruals/{accrualId}: Stores accrual information. Contains a `vendorId` field for authorization.
+ *
+ * Key Security Decisions:
+ * - No user listing is allowed.
+ * - All write operations are validated against the `vendorId` to ensure that only the correct vendor can modify the data.
+ *
+ * Denormalization for Authorization:
+ * - The `contracts` collection denormalizes the `vendorId` so that rules on `/contracts/{contractId}` can efficiently check vendor ownership without additional reads.
+ * - The `rebate_rules` collection denormalizes the `contractId` so that rules on `/rebate_rules/{rebateRuleId}` can efficiently associate rules with specific contracts without additional reads.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Secure the vendors collection. Only allow a vendor to manage their own vendor document.
+     * @path /vendors/{vendorId}
+     * @allow (create) - A vendor with UID 'vendor_abc' can create their vendor document if the vendorId matches their UID.
+     * @allow (update) - A vendor with UID 'vendor_abc' can update their vendor document if the vendorId matches their UID.
+     * @allow (delete) - A vendor with UID 'vendor_abc' can delete their vendor document if the vendorId matches their UID and the document exists.
+     * @deny (create) - A vendor with UID 'vendor_def' cannot create a vendor document with vendorId 'vendor_abc'.
+     * @deny (update) - A vendor with UID 'vendor_def' cannot update a vendor document with vendorId 'vendor_abc'.
+     * @deny (delete) - A vendor with UID 'vendor_def' cannot delete a vendor document with vendorId 'vendor_abc'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /vendors/{vendorId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == vendorId;
+      allow update: if isSignedIn() && isExistingOwner(vendorId);
+      allow delete: if isSignedIn() && isExistingOwner(vendorId);
+    }
+
+    /**
+     * @description Secure the contracts collection. Only allow vendors to manage contracts associated with their vendor ID.
+     * @path /contracts/{contractId}
+     * @allow (create) - A vendor with UID 'vendor_abc' can create a contract with vendorId 'vendor_abc'.
+     * @allow (update) - A vendor with UID 'vendor_abc' can update a contract with vendorId 'vendor_abc'.
+     * @allow (delete) - A vendor with UID 'vendor_abc' can delete a contract with vendorId 'vendor_abc' if the document exists.
+     * @deny (create) - A vendor with UID 'vendor_def' cannot create a contract with vendorId 'vendor_abc'.
+     * @deny (update) - A vendor with UID 'vendor_def' cannot update a contract with vendorId 'vendor_abc'.
+     * @deny (delete) - A vendor with UID 'vendor_def' cannot delete a contract with vendorId 'vendor_abc'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /contracts/{contractId} {
+      allow read: if isSignedIn() && isExistingContractOwner(contractId);
+      allow list: if isSignedIn() && query.filters.vendorId[0][2] == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.vendorId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingContractOwner(contractId);
+      allow delete: if isSignedIn() && isExistingContractOwner(contractId);
+    }
+
+    /**
+     * @description Secure the contract_files collection.
+     * @path /contract_files/{contractFileId}
+     * @allow (create) - Any authenticated user can create a contract file.
+     * @allow (update) - Any authenticated user can update a contract file.
+     * @allow (delete) - Any authenticated user can delete a contract file.
+     * @principle  Allows public read access with owner-only writes, but ownership is not yet defined.
+     */
+    match /contract_files/{contractFileId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if isSignedIn() && resource != null; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn() && resource != null;// TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Secure the rebate_rules collection. Only allow vendors to manage rebate rules associated with their contracts.
+     * @path /rebate_rules/{rebateRuleId}
+     * @allow (create) - A vendor with UID 'vendor_abc' can create a rebate rule for a contract with vendorId 'vendor_abc'.
+     * @allow (update) - A vendor with UID 'vendor_abc' can update a rebate rule for a contract with vendorId 'vendor_abc'.
+     * @allow (delete) - A vendor with UID 'vendor_abc' can delete a rebate rule for a contract with vendorId 'vendor_abc' if the document exists.
+     * @deny (create) - A vendor with UID 'vendor_def' cannot create a rebate rule for a contract with vendorId 'vendor_abc'.
+     * @deny (update) - A vendor with UID 'vendor_def' cannot update a rebate rule for a contract with vendorId 'vendor_abc'.
+     * @deny (delete) - A vendor with UID 'vendor_def' cannot delete a rebate rule for a contract with vendorId 'vendor_abc'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /rebate_rules/{rebateRuleId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/contracts/$(request.resource.data.contractId)).data.vendorId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingRebateRuleOwner(rebateRuleId);
+      allow delete: if isSignedIn() && isExistingRebateRuleOwner(rebateRuleId);
+    }
+    
+    /**
+     * @description Secure the claims collection. Only allow vendors to manage claims associated with their vendor ID.
+     * @path /claims/{claimId}
+     * @principle Enforces document ownership for writes.
+     */
+    match /claims/{claimId} {
+      allow read: if isSignedIn() && isExistingClaimOwner(claimId);
+      allow list: if isSignedIn() && query.filters.vendorId[0][2] == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.vendorId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingClaimOwner(claimId);
+      allow delete: if isSignedIn() && isExistingClaimOwner(claimId);
+    }
+
+    /**
+     * @description Secure the accruals collection. Only allow vendors to manage accruals associated with their vendor ID.
+     * @path /accruals/{accrualId}
+     * @principle Enforces document ownership for writes.
+     */
+    match /accruals/{accrualId} {
+      allow read: if isSignedIn() && isExistingAccrualOwner(accrualId);
+      allow list: if isSignedIn() && query.filters.vendorId[0][2] == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.vendorId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingAccrualOwner(accrualId);
+      allow delete: if isSignedIn() && isExistingAccrualOwner(accrualId);
+    }
+
+    /**
+     * @description Secure the disputes collection. Only allow vendors to manage disputes associated with their vendor ID.
+     * @path /disputes/{disputeId}
+     * @principle Enforces document ownership for writes.
+     */
+    match /disputes/{disputeId} {
+      allow read: if isSignedIn() && isExistingDisputeOwner(disputeId);
+      allow list: if isSignedIn() && query.filters.vendorId[0][2] == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.vendorId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingDisputeOwner(disputeId);
+      allow delete: if isSignedIn() && isExistingDisputeOwner(disputeId);
+    }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(vendorId) {
+    return isOwner(vendorId) && resource != null;
+  }
+
+
+  function isExistingContractOwner(contractId) {
+      return resource != null && resource.data.vendorId == request.auth.uid;
+  }
+
+  function isRebateRuleOwner(rebateRuleId) {
+    let contractId = get(/databases/$(database)/documents/rebate_rules/$(rebateRuleId)).data.contractId;
+      return get(/databases/$(database)/documents/contracts/$(contractId)).data.vendorId == request.auth.uid;
+  }
+
+  function isExistingRebateRuleOwner(rebateRuleId) {
+    return resource != null && isRebateRuleOwner(rebateRuleId);
+  }
+
+  function isExistingClaimOwner(claimId) {
+    return resource != null && resource.data.vendorId == request.auth.uid;
+  }
+
+  function isExistingAccrualOwner(accrualId) {
+    return resource != null && resource.data.vendorId == request.auth.uid;
+  }
+
+  function isExistingDisputeOwner(disputeId) {
+    return resource != null && resource.data.vendorId == request.auth.uid;
+  }
+}

@@ -1,0 +1,450 @@
+{
+  "entities": {
+    "Contract": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Contract",
+      "type": "object",
+      "description": "Represents a rebate contract.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Contract entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the contract."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the contract."
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Reference to Vendor. (Relationship: Vendor 1:N Contract)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date of the contract.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date of the contract.",
+          "format": "date-time"
+        },
+        "terms": {
+          "type": "string",
+          "description": "Terms and conditions of the contract."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the contract (e.g., active, inactive, pending)."
+        },
+        "contractFileUrl": {
+          "type": "string",
+          "description": "URL to the contract file stored in Firebase Storage."
+        },
+        "rebateRates": {
+          "type": "string",
+          "description": "The rebate rates specified in the contract."
+        },
+        "eligibilityCriteria": {
+          "type": "string",
+          "description": "The criteria for determining eligibility for rebates."
+        },
+        "productList": {
+          "type": "string",
+          "description": "A list of products covered by the contract."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "vendorId",
+        "startDate",
+        "endDate",
+        "terms",
+        "status",
+        "contractFileUrl"
+      ]
+    },
+    "Vendor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Vendor",
+      "type": "object",
+      "description": "Represents a vendor offering rebates.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Vendor entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the vendor."
+        },
+        "contactInformation": {
+          "type": "string",
+          "description": "Contact details for the vendor."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "ContractFile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ContractFile",
+      "type": "object",
+      "description": "Represents a digital file containing a rebate contract document.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ContractFile entity."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Name of the contract file."
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Type of the contract file (e.g., PDF, DOCX)."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Size of the contract file in bytes."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Date when the contract file was uploaded.",
+          "format": "date-time"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "File path or URL where the contract file is stored."
+        }
+      },
+      "required": [
+        "id",
+        "fileName",
+        "fileType",
+        "fileSize",
+        "uploadDate",
+        "filePath"
+      ]
+    },
+    "RebateRule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RebateRule",
+      "type": "object",
+      "description": "Represents a rule defining rebate eligibility criteria.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RebateRule entity."
+        },
+        "contractId": {
+          "type": "string",
+          "description": "Reference to Contract. (Relationship: Contract 1:N RebateRule)"
+        },
+        "ruleType": {
+          "type": "string",
+          "description": "Type of the rebate rule (e.g., tier, bundle, eligibility)."
+        },
+        "ruleDescription": {
+          "type": "string",
+          "description": "Detailed description of the rebate rule."
+        },
+        "eligibilityCriteria": {
+          "type": "string",
+          "description": "Criteria that must be met for a claim to be eligible for a rebate."
+        }
+      },
+      "required": [
+        "id",
+        "contractId",
+        "ruleType",
+        "ruleDescription",
+        "eligibilityCriteria"
+      ]
+    },
+    "Claim": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Claim",
+      "type": "object",
+      "description": "Represents a rebate claim submitted against a contract.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Claim entity."
+        },
+        "contractId": {
+          "type": "string",
+          "description": "Reference to Contract."
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Reference to Vendor who owns the contract."
+        },
+        "claimDate": {
+          "type": "string",
+          "description": "Date the claim was submitted.",
+          "format": "date-time"
+        },
+        "claimAmount": {
+          "type": "number",
+          "description": "The amount being claimed."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the claim (e.g., pending-review, approved, rejected).",
+          "enum": [
+            "pending-review",
+            "approved",
+            "rejected"
+          ]
+        },
+        "details": {
+          "type": "string",
+          "description": "Description or details about the claim."
+        }
+      },
+      "required": [
+        "id",
+        "contractId",
+        "vendorId",
+        "claimDate",
+        "claimAmount",
+        "status",
+        "details"
+      ]
+    },
+    "Accrual": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Accrual",
+      "type": "object",
+      "description": "Represents an accrued rebate amount.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Accrual entity."
+        },
+        "claimId": {
+          "type": "string",
+          "description": "Reference to the Claim."
+        },
+        "contractId": {
+          "type": "string",
+          "description": "Reference to the Contract."
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Reference to the Vendor."
+        },
+        "accrualDate": {
+          "type": "string",
+          "description": "Date the accrual was recorded.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The accrued amount."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the accrual (e.g., accrued, paid).",
+          "enum": [
+            "accrued",
+            "paid"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes related to the accrual."
+        }
+      },
+      "required": [
+        "id",
+        "claimId",
+        "contractId",
+        "vendorId",
+        "accrualDate",
+        "amount",
+        "status"
+      ]
+    },
+    "Dispute": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Dispute",
+      "type": "object",
+      "description": "Represents a disputed claim.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Dispute entity."
+        },
+        "claimId": {
+          "type": "string",
+          "description": "Reference to the disputed Claim."
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Reference to the Vendor."
+        },
+        "disputeDate": {
+          "type": "string",
+          "description": "Date the dispute was raised.",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "description": "The reason for the dispute."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the dispute (e.g., open, resolved, closed).",
+          "enum": [
+            "open",
+            "resolved",
+            "closed"
+          ]
+        },
+        "resolutionDetails": {
+          "type": "string",
+          "description": "Details about the resolution of the dispute."
+        }
+      },
+      "required": [
+        "id",
+        "claimId",
+        "vendorId",
+        "disputeDate",
+        "reason",
+        "status"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/vendors/{vendorId}",
+        "definition": {
+          "entityName": "Vendor",
+          "schema": {
+            "$ref": "#/backend/entities/Vendor"
+          },
+          "description": "Stores vendor information. This collection contains data about vendors, with each document representing a single vendor.",
+          "params": [
+            {
+              "name": "vendorId",
+              "description": "The unique identifier of the vendor."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/contracts/{contractId}",
+        "definition": {
+          "entityName": "Contract",
+          "schema": {
+            "$ref": "#/backend/entities/Contract"
+          },
+          "description": "Stores contract information. Includes `vendorId` for authorization independence and efficient querying.",
+          "params": [
+            {
+              "name": "contractId",
+              "description": "The unique identifier of the contract."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/contract_files/{contractFileId}",
+        "definition": {
+          "entityName": "ContractFile",
+          "schema": {
+            "$ref": "#/backend/entities/ContractFile"
+          },
+          "description": "Stores contract file information.  Each document represents a file associated with a contract.",
+          "params": [
+            {
+              "name": "contractFileId",
+              "description": "The unique identifier of the contract file."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/rebate_rules/{rebateRuleId}",
+        "definition": {
+          "entityName": "RebateRule",
+          "schema": {
+            "$ref": "#/backend/entities/RebateRule"
+          },
+          "description": "Stores rebate rule information. Includes `contractId` for associating rules with specific contracts.",
+          "params": [
+            {
+              "name": "rebateRuleId",
+              "description": "The unique identifier of the rebate rule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/claims/{claimId}",
+        "definition": {
+          "entityName": "Claim",
+          "schema": {
+            "$ref": "#/backend/entities/Claim"
+          },
+          "description": "Stores rebate claim information. Includes `vendorId` for authorization.",
+          "params": [
+            {
+              "name": "claimId",
+              "description": "The unique identifier of the claim."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/accruals/{accrualId}",
+        "definition": {
+          "entityName": "Accrual",
+          "schema": {
+            "$ref": "#/backend/entities/Accrual"
+          },
+          "description": "Stores accrual information for rebates. Includes `vendorId` for authorization.",
+          "params": [
+            {
+              "name": "accrualId",
+              "description": "The unique identifier of the accrual."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/disputes/{disputeId}",
+        "definition": {
+          "entityName": "Dispute",
+          "schema": {
+            "$ref": "#/backend/entities/Dispute"
+          },
+          "description": "Stores dispute information for claims. Includes `vendorId` for authorization.",
+          "params": [
+            {
+              "name": "disputeId",
+              "description": "The unique identifier of the dispute."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the RebateOS application, emphasizing secure, scalable, and easily debuggable security rules, focusing on the Contract Inbox feature set. The structure adheres to the core design principles of Authorization Independence, Clarity of Intent, DBAC, QAPs and Invariants.  Authorization independence is achieved through denormalization. Structural Segregation isolates collections based on security needs. Access Modeling uses path-based ownership for user-owned data and membership maps for collaborative data. Data Clarity and Predictability is enhanced via explicit state modeling and consistent naming conventions.\n\nTo achieve Authorization Independence (CRITICAL), the structure avoids hierarchical authorization dependencies (`get()`).  For example, the contracts collection contains a `vendorId` so that rules can limit access to contracts for a specific vendor. This also applies to collections like `rebate_rules`, which includes a `contractId`."
+  }
+}
