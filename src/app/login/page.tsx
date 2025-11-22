@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { useFirebase } from '@/firebase/provider';
+import { useSupabase } from '@/components/supabase-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +13,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { auth, user, isUserLoading } = useFirebase();
+  const { supabase, user, isLoading: isUserLoading } = useSupabase();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,10 +21,11 @@ export default function LoginPage() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Redirect if already logged in
-  if (!isUserLoading && user && !user.isAnonymous) {
-    router.push('/dashboard');
-    return null;
-  }
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [isUserLoading, user, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,18 +33,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
       router.push('/dashboard');
     } catch (err: any) {
-      const errorMessages: Record<string, string> = {
-        'auth/invalid-email': 'Invalid email address.',
-        'auth/user-disabled': 'This account has been disabled.',
-        'auth/user-not-found': 'No account found with this email.',
-        'auth/wrong-password': 'Incorrect password.',
-        'auth/invalid-credential': 'Invalid email or password.',
-        'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
-      };
-      setError(errorMessages[err.code] || 'An error occurred. Please try again.');
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -59,14 +57,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
       setResetEmailSent(true);
     } catch (err: any) {
-      const errorMessages: Record<string, string> = {
-        'auth/invalid-email': 'Invalid email address.',
-        'auth/user-not-found': 'No account found with this email.',
-      };
-      setError(errorMessages[err.code] || 'Failed to send reset email.');
+      setError(err.message || 'Failed to send reset email.');
     } finally {
       setLoading(false);
     }

@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirebase } from '@/firebase/provider';
+import { useSupabase } from '@/components/supabase-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,7 +23,7 @@ const USER_ROLES = [
 
 export default function SignupPage() {
   const router = useRouter();
-  const { auth, firestore, user, isUserLoading } = useFirebase();
+  const { supabase, user, isLoading: isUserLoading } = useSupabase();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,10 +36,11 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
 
   // Redirect if already logged in
-  if (!isUserLoading && user && !user.isAnonymous) {
-    router.push('/dashboard');
-    return null;
-  }
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [isUserLoading, user, router]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -72,40 +71,26 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // Create user account
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-
-      // Update profile with display name
-      await updateProfile(userCredential.user, {
-        displayName: formData.name,
-      });
-
-      // Create user document in Firestore
-      await setDoc(doc(firestore, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
-        name: formData.name,
-        role: formData.role,
-        organization: formData.organization,
-        permissions: getPermissionsForRole(formData.role),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        status: 'active',
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+            organization: formData.organization,
+            role: formData.role,
+          },
+        },
       });
+
+      if (signUpError) throw signUpError;
+
+      // Profile is automatically created by the database trigger
+      // No need to manually insert into profiles table
 
       router.push('/dashboard');
     } catch (err: any) {
-      const errorMessages: Record<string, string> = {
-        'auth/email-already-in-use': 'An account with this email already exists.',
-        'auth/invalid-email': 'Invalid email address.',
-        'auth/weak-password': 'Password is too weak. Please use a stronger password.',
-        'auth/operation-not-allowed': 'Email/password accounts are not enabled.',
-      };
-      setError(errorMessages[err.code] || 'An error occurred. Please try again.');
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -238,58 +223,4 @@ export default function SignupPage() {
       </Card>
     </div>
   );
-}
-
-// Helper function to get default permissions based on role
-function getPermissionsForRole(role: string): string[] {
-  const rolePermissions: Record<string, string[]> = {
-    admin: [
-      'contracts:read', 'contracts:write', 'contracts:delete',
-      'claims:read', 'claims:write', 'claims:delete',
-      'disputes:read', 'disputes:write', 'disputes:delete',
-      'rules:read', 'rules:write', 'rules:delete',
-      'users:read', 'users:write', 'users:delete',
-      'settings:read', 'settings:write',
-      'reports:read', 'reports:export',
-      'audit:read',
-    ],
-    finance: [
-      'contracts:read',
-      'claims:read', 'claims:write',
-      'disputes:read', 'disputes:write',
-      'rules:read',
-      'reports:read', 'reports:export',
-      'audit:read',
-    ],
-    supply_chain: [
-      'contracts:read', 'contracts:write',
-      'claims:read',
-      'rules:read', 'rules:write',
-      'reports:read',
-    ],
-    pharmacy: [
-      'contracts:read',
-      'claims:read', 'claims:write',
-      'disputes:read',
-      'rules:read',
-      'reports:read',
-    ],
-    compliance: [
-      'contracts:read',
-      'claims:read',
-      'disputes:read',
-      'rules:read',
-      'reports:read', 'reports:export',
-      'audit:read',
-    ],
-    analyst: [
-      'contracts:read',
-      'claims:read',
-      'disputes:read',
-      'rules:read',
-      'reports:read', 'reports:export',
-    ],
-  };
-
-  return rolePermissions[role] || [];
 }
