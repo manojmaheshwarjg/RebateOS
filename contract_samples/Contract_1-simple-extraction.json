@@ -1,0 +1,141 @@
+{
+  "products": [
+    {
+      "productName": "CardioCare 25mg Tablets",
+      "ndc": "12345-678-90",
+      "strength": "25mg",
+      "packageSize": "100 tablets",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Cardiovascular",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n12345-678-90CardioCare 25mg Tablets100 tabletsBottle"
+    },
+    {
+      "productName": "CardioCare 50mg Tablets",
+      "ndc": "12345-678-91",
+      "strength": "50mg",
+      "packageSize": "100 tablets",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Cardiovascular",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n12345-678-91CardioCare 50mg Tablets100 tabletsBottle"
+    },
+    {
+      "productName": "CardioCare 100mg Tablets",
+      "ndc": "12345-678-92",
+      "strength": "100mg",
+      "packageSize": "90 tablets",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Cardiovascular",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n12345-678-92CardioCare 100mg Tablets90 tabletsBottle"
+    },
+    {
+      "productName": "DiabetesMed Injectable 10mg/mL",
+      "ndc": "54321-111-22",
+      "strength": "10mg/mL",
+      "packageSize": "3mL vial",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Diabetes Management",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n54321-111-22DiabetesMed Injectable 10mg/mL3mL vialSingle Vial"
+    },
+    {
+      "productName": "DiabetesMed Injectable 10mg/mL",
+      "ndc": "54321-111-23",
+      "strength": "10mg/mL",
+      "packageSize": "10mL vial",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Diabetes Management",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n54321-111-23DiabetesMed Injectable 10mg/mL10mL vialSingle Vial"
+    },
+    {
+      "productName": "ImmunoBoost IV Solution 500mg",
+      "ndc": "98765-432-10",
+      "strength": "500mg",
+      "packageSize": "100mL bag",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Immunology",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n98765-432-10ImmunoBoost IV Solution 500mg100mL bagSingle Bag"
+    },
+    {
+      "productName": "ImmunoBoost IV Solution 1000mg",
+      "ndc": "98765-432-11",
+      "strength": "1000mg",
+      "packageSize": "250mL bag",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Immunology",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n98765-432-11ImmunoBoost IV Solution 1000mg250mL bagSingle Bag"
+    },
+    {
+      "productName": "PainRelief Extended Release 200mg",
+      "ndc": "11111-222-33",
+      "strength": "200mg",
+      "packageSize": "60 capsules",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Pain Management",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n11111-222-33PainRelief Extended Release 200mg60 capsulesBottle"
+    },
+    {
+      "productName": "PainRelief Extended Release 400mg",
+      "ndc": "11111-222-34",
+      "strength": "400mg",
+      "packageSize": "60 capsules",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Pain Management",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n11111-222-34PainRelief Extended Release 400mg60 capsulesBottle"
+    },
+    {
+      "productName": "AntiViral Oral Suspension 50mg/mL",
+      "ndc": "77777-888-99",
+      "strength": "50mg/mL",
+      "packageSize": "120mL",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Infectious Diseases",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n77777-888-99AntiViral Oral Suspension 50mg/mL120mLBottle"
+    },
+    {
+      "productName": "OncologyRx Injectable 100mg",
+      "ndc": "66666-555-44",
+      "strength": "100mg",
+      "packageSize": "20mL vial",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Oncology",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n66666-555-44OncologyRx Injectable 100mg20mL vialSingle Vial"
+    },
+    {
+      "productName": "OncologyRx Injectable 200mg",
+      "ndc": "66666-555-45",
+      "strength": "200mg",
+      "packageSize": "40mL vial",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Oncology",
+      "sourceQuote": "NDC CodeProduct DescriptionPackage SizeUnit Type\n66666-555-45OncologyRx Injectable 200mg40mL vialSingle Vial"
+    },
+    {
+      "productName": "RespiCare Inhaler 100mcg",
+      "ndc": "99999-777-88",
+      "strength": "100mcg",
+      "packageSize": "200 doses",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Respiratory",
+      "sourceQuote": "Amendment No. 2 (Effective July 15, 2024): Added three new NDC codes to Section 1.1 Covered Products list: • NDC 99999-777-88 (RespiCare Inhaler 100mcg, 200 doses)"
+    },
+    {
+      "productName": "RespiCare Inhaler 200mcg",
+      "ndc": "99999-777-89",
+      "strength": "200mcg",
+      "packageSize": "200 doses",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Respiratory",
+      "sourceQuote": "Amendment No. 2 (Effective July 15, 2024): Added three new NDC codes to Section 1.1 Covered Products list: • NDC 99999-777-89 (RespiCare Inhaler 200mcg, 200 doses)"
+    },
+    {
+      "productName": "CholesMed Tablets 40mg",
+      "ndc": "88888-666-55",
+      "strength": "40mg",
+      "packageSize": "90 tablets",
+      "manufacturer": "Acme Pharmaceuticals International, Inc.",
+      "category": "Cardiovascular",
+      "sourceQuote": "Amendment No. 2 (Effective July 15, 2024): Added three new NDC codes to Section 1.1 Covered Products list: • NDC 88888-666-55 (CholesMed Tablets 40mg, 90 tablets)"
+    }
+  ],
+  "totalProducts": 13,
+  "extractionNotes": "Found products in product list table and amendments"
+}

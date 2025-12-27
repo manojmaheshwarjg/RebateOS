@@ -13,84 +13,98 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, updateDoc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 import { Skeleton } from './ui/skeleton';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useState, useEffect } from 'react';
 
 interface Claim {
     id: string;
-    contractId: string;
-    vendorId: string;
-    claimDate: string;
-    claimAmount: number;
+    contract_id: string;
+    claim_date: string;
+    amount: number;
     status: 'pending-review' | 'approved' | 'rejected';
     details: string;
-}
-
-interface Contract {
-    id: string;
-    name: string;
-}
-
-interface EnrichedClaim extends Claim {
-    contractName: string;
+    contracts: {
+        name: string;
+    } | null;
 }
 
 
 export default function EligibilityQueueTable() {
-    const { firestore, user } = useFirebase();
+    const { db, userId } = useLocalStorage();
     const { toast } = useToast();
-    const [enrichedClaims, setEnrichedClaims] = useState<EnrichedClaim[]>([]);
-    const [claimsLoading, setClaimsLoading] = useState(true);
+    const [claims, setClaims] = useState<Claim[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const contractsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'contracts'), where('vendorId', '==', user.uid));
-    }, [firestore, user]);
+    const fetchClaims = async () => {
+        setIsLoading(true);
+        try {
+            // Fetch pending claims
+            const claimsData = await db.claims
+                .where('vendor_id')
+                .equals(userId)
+                .and(claim => claim.status === 'pending-review')
+                .reverse()
+                .sortBy('claim_date');
 
-    const { data: contracts, isLoading: contractsLoading } = useCollection<Contract>(contractsQuery);
+            // Get unique contract IDs
+            const contractIds = [...new Set(claimsData.map(c => c.contract_id))];
 
-    const claimsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'claims'), where('vendorId', '==', user.uid), where('status', '==', 'pending-review'));
-    }, [firestore, user]);
+            // Fetch contracts in bulk
+            const contracts = await db.contracts.bulkGet(contractIds);
 
-    const { data: claims, isLoading: areClaimsLoading } = useCollection<Claim>(claimsQuery);
+            // Create a map for quick lookup
+            const contractMap = new Map(
+                contracts.filter(Boolean).map(c => [c!.id, c!])
+            );
 
-     useEffect(() => {
-        setClaimsLoading(contractsLoading || areClaimsLoading);
-        if (claims && contracts) {
-            const contractMap = new Map(contracts.map(c => [c.id, c.name]));
-            const newEnrichedClaims = claims.map(claim => ({
+            // Enrich claims with contract names
+            const enrichedClaims = claimsData.map(claim => ({
                 ...claim,
-                contractName: contractMap.get(claim.contractId) || 'Unknown Contract',
-            }));
-            setEnrichedClaims(newEnrichedClaims);
-        } else if (!contractsLoading && !areClaimsLoading) {
-            setEnrichedClaims([]);
+                contracts: contractMap.get(claim.contract_id) ? { name: contractMap.get(claim.contract_id)!.name } : null,
+            })) as Claim[];
+
+            setClaims(enrichedClaims);
+        } catch (error) {
+            console.error('Error fetching claims:', error);
+        } finally {
+            setIsLoading(false);
         }
-    }, [claims, contracts, contractsLoading, areClaimsLoading]);
+    };
+
+    useEffect(() => {
+        fetchClaims();
+    }, [db, userId]);
 
 
-    const handleStatusUpdate = (claimId: string, status: 'approved' | 'rejected') => {
-        if (!firestore) return;
-        const claimRef = doc(firestore, 'claims', claimId);
-        updateDocumentNonBlocking(claimRef, { status });
-        toast({
-            title: "Success",
-            description: `Claim status updated to ${status}.`
-        })
+    const handleStatusUpdate = async (claimId: string, status: 'approved' | 'rejected') => {
+        try {
+            await db.claims.update(claimId, { status });
+
+            toast({
+                title: "Success",
+                description: `Claim status updated to ${status}.`
+            });
+
+            // Refresh the list
+            fetchClaims();
+        } catch (error) {
+            console.error('Error updating claim status:', error);
+            toast({
+                title: "Error",
+                description: "Failed to update claim status.",
+                variant: "destructive"
+            });
+        }
     };
 
 
-    if (claimsLoading) {
+    if (isLoading) {
         return (
             <div className="space-y-2">
                 <Skeleton className="h-10 w-full" />
@@ -99,8 +113,8 @@ export default function EligibilityQueueTable() {
             </div>
         );
     }
-    
-    if (enrichedClaims.length === 0) {
+
+    if (claims.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
                 <h3 className="text-lg font-semibold">Queue is Clear</h3>
@@ -124,11 +138,11 @@ export default function EligibilityQueueTable() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {enrichedClaims.map((claim) => (
+                {claims.map((claim) => (
                     <TableRow key={claim.id}>
-                        <TableCell className="font-medium">{claim.contractName}</TableCell>
-                        <TableCell>${claim.claimAmount.toFixed(2)}</TableCell>
-                        <TableCell>{new Date(claim.claimDate).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-medium">{claim.contracts?.name || 'Unknown Contract'}</TableCell>
+                        <TableCell>${claim.amount.toFixed(2)}</TableCell>
+                        <TableCell>{new Date(claim.claim_date).toLocaleDateString()}</TableCell>
                         <TableCell className="max-w-xs truncate">{claim.details}</TableCell>
                         <TableCell>
                             <Badge variant={claim.status === 'pending-review' ? 'secondary' : 'default'}>
@@ -136,12 +150,12 @@ export default function EligibilityQueueTable() {
                             </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                             <DropdownMenu>
+                            <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                        <span className="sr-only">Open menu</span>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => handleStatusUpdate(claim.id, 'approved')}>

@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -33,8 +32,8 @@ import {
   FileText,
   History,
   Loader2,
-  Send,
   Shield,
+  Activity
 } from 'lucide-react';
 
 interface ReportTemplate {
@@ -120,49 +119,18 @@ export default function ReportingPage() {
       timestamp: '2024-01-15T14:25:00',
       ipAddress: '192.168.1.105',
     },
-    {
-      id: '3',
-      user: 'admin@hospital.org',
-      action: 'MODIFY',
-      resource: 'User Permissions',
-      timestamp: '2024-01-15T14:20:00',
-      ipAddress: '192.168.1.1',
-    },
-    {
-      id: '4',
-      user: 'john.smith@hospital.org',
-      action: 'APPROVE',
-      resource: 'Claim #CLM-2024-001',
-      timestamp: '2024-01-15T14:15:00',
-      ipAddress: '192.168.1.100',
-    },
   ]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'current':
-        return (
-          <Badge className="bg-green-100 text-green-800">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Current
-          </Badge>
-        );
+        return <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 rounded-sm">Current</Badge>;
       case 'due':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">
-            <Clock className="mr-1 h-3 w-3" />
-            Due
-          </Badge>
-        );
+        return <Badge variant="outline" className="text-amber-700 border-amber-200 bg-amber-50 rounded-sm">Due</Badge>;
       case 'overdue':
-        return (
-          <Badge variant="destructive">
-            <AlertTriangle className="mr-1 h-3 w-3" />
-            Overdue
-          </Badge>
-        );
+        return <Badge variant="destructive" className="rounded-sm">Overdue</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="rounded-sm">{status}</Badge>;
     }
   };
 
@@ -177,27 +145,30 @@ export default function ReportingPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Compliance & Reporting</h1>
-        <p className="text-muted-foreground">
-          Generate CMS/GPO reports and maintain audit trails
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">Compliance & Reporting</h1>
+            <p className="text-sm text-slate-500">Generate regulatory reports and view audit logs.</p>
+          </div>
+        </div>
+      </header>
 
-      <Tabs defaultValue="reports" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="reports">Report Generator</TabsTrigger>
-          <TabsTrigger value="attestations">Attestations</TabsTrigger>
-          <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-          <TabsTrigger value="security">Security Center</TabsTrigger>
-        </TabsList>
+      <main className="container mx-auto px-6 py-8">
+        <Tabs defaultValue="reports" className="space-y-6">
+          <TabsList className="bg-white border border-slate-200 p-1 h-auto rounded-md">
+            <TabsTrigger value="reports" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Report Generator</TabsTrigger>
+            <TabsTrigger value="attestations" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Attestations</TabsTrigger>
+            <TabsTrigger value="audit" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Audit Logs</TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Security</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="reports" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
+          <TabsContent value="reports" className="space-y-4">
+            <div className="flex justify-between items-center bg-white p-3 border border-slate-200 rounded-md">
+              <span className="text-sm font-medium text-slate-700 ml-2">Reporting Period:</span>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 h-8 text-xs border-slate-300">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -207,211 +178,110 @@ export default function ReportingPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid gap-4">
-            {reports.map((report) => (
-              <Card key={report.id}>
-                <CardContent className="flex items-center justify-between p-4">
+            <div className="space-y-2">
+              {reports.map((report) => (
+                <div key={report.id} className="group flex items-center justify-between p-4 bg-white border border-slate-200 rounded-md hover:border-indigo-300 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-lg ${
-                      report.type === 'cms' ? 'bg-blue-100' :
-                      report.type === 'gpo' ? 'bg-purple-100' : 'bg-gray-100'
-                    }`}>
-                      {report.type === 'cms' ? (
-                        <FileBarChart className="h-5 w-5 text-blue-600" />
-                      ) : report.type === 'gpo' ? (
-                        <FileText className="h-5 w-5 text-purple-600" />
-                      ) : (
-                        <FileSpreadsheet className="h-5 w-5 text-gray-600" />
-                      )}
+                    <div className={
+                      `p-2 rounded-md border ${report.type === 'cms' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                        report.type === 'gpo' ? 'bg-purple-50 border-purple-100 text-purple-600' : 'bg-slate-50 border-slate-200 text-slate-600'
+                      }`}>
+                      {report.type === 'cms' ? <FileBarChart className="h-5 w-5" /> : report.type === 'gpo' ? <FileText className="h-5 w-5" /> : <FileSpreadsheet className="h-5 w-5" />}
                     </div>
                     <div>
-                      <h3 className="font-medium">{report.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {report.frequency} • Last generated: {new Date(report.lastGenerated).toLocaleDateString()}
+                      <h3 className="font-semibold text-slate-900 text-sm">{report.name}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {report.frequency} • Last: <span className="font-mono">{new Date(report.lastGenerated).toLocaleDateString()}</span>
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 opacity-70 group-hover:opacity-100 transition-opacity">
                     {getStatusBadge(report.status)}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleGenerateReport(report.id)}
-                        disabled={generating}
-                      >
-                        {generating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <FileBarChart className="mr-2 h-4 w-4" />
-                            Generate
-                          </>
-                        )}
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <div className="h-4 w-px bg-slate-200" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleGenerateReport(report.id)}
+                      disabled={generating}
+                      className="h-8 text-xs bg-white hover:bg-slate-50"
+                    >
+                      {generating ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Download className="h-3 w-3 mr-2" />}
+                      Generate
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="attestations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Compliance Attestations</CardTitle>
-              <CardDescription>
-                Complete required attestations for regulatory compliance
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">GPO Compliance Attestation - Q1 2024</h4>
-                  <Badge className="bg-green-100 text-green-800">Completed</Badge>
+          <TabsContent value="attestations" className="space-y-4">
+            <div className="grid gap-4">
+              <div className="p-6 bg-white border border-slate-200 rounded-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-emerald-600" />
+                    <h4 className="font-bold text-slate-900">GPO Compliance Attestation</h4>
+                  </div>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Completed</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Quarterly attestation confirming compliance with GPO contract terms
-                </p>
-                <div className="space-y-2">
+                <div className="space-y-3 pl-7">
                   <div className="flex items-center gap-2">
-                    <Checkbox checked disabled />
-                    <span className="text-sm">All rebate claims are accurate and complete</span>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm text-slate-700">All rebate claims are accurate and complete</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Checkbox checked disabled />
-                    <span className="text-sm">No duplicate discounts claimed</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked disabled />
-                    <span className="text-sm">All documentation is maintained per requirements</span>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm text-slate-700">No duplicate discounts claimed</span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Signed by: John Smith • January 15, 2024
-                </p>
               </div>
+            </div>
+          </TabsContent>
 
-              <div className="p-4 border rounded-lg border-yellow-200 bg-yellow-50">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">340B Program Attestation - 2024</h4>
-                  <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Annual attestation for 340B program compliance
-                </p>
-                <Button size="sm">Complete Attestation</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="audit" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Access Logs</CardTitle>
-              <CardDescription>
-                Complete audit trail of system access and modifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <TabsContent value="audit" className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Resource</TableHead>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>IP Address</TableHead>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="font-bold text-slate-700 h-10 text-xs uppercase tracking-wider">User</TableHead>
+                    <TableHead className="font-bold text-slate-700 h-10 text-xs uppercase tracking-wider">Action</TableHead>
+                    <TableHead className="font-bold text-slate-700 h-10 text-xs uppercase tracking-wider">Resource</TableHead>
+                    <TableHead className="font-bold text-slate-700 h-10 text-xs uppercase tracking-wider">Timestamp</TableHead>
+                    <TableHead className="font-bold text-slate-700 h-10 text-xs uppercase tracking-wider">IP Address</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {accessLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>{log.user}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{log.action}</Badge>
+                    <TableRow key={log.id} className="hover:bg-slate-50/50">
+                      <TableCell className="py-2 text-xs font-medium text-slate-900">{log.user}</TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="secondary" className="text-[10px] bg-slate-100 text-slate-600 border-none font-mono">
+                          {log.action}
+                        </Badge>
                       </TableCell>
-                      <TableCell>{log.resource}</TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="py-2 text-xs text-slate-600">{log.resource}</TableCell>
+                      <TableCell className="py-2 text-xs text-slate-500">
                         {new Date(log.timestamp).toLocaleString()}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{log.ipAddress}</TableCell>
+                      <TableCell className="py-2 font-mono text-[10px] text-slate-400">{log.ipAddress}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <div className="flex justify-end mt-4">
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Logs
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <TabsContent value="security" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Center</CardTitle>
-              <CardDescription>
-                Manage encryption, BAA, and PHI protection settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="h-5 w-5 text-green-600" />
-                    <h4 className="font-medium">Encryption Status</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    All data encrypted at rest and in transit
-                  </p>
-                  <Badge className="bg-green-100 text-green-800">AES-256 Active</Badge>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                    <h4 className="font-medium">BAA Management</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Business Associate Agreements on file
-                  </p>
-                  <Badge variant="outline">3 Active BAAs</Badge>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <History className="h-5 w-5 text-purple-600" />
-                    <h4 className="font-medium">Data Retention</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Automatic retention policies applied
-                  </p>
-                  <Badge variant="outline">7 Years</Badge>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <h4 className="font-medium">HIPAA Compliance</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    PHI protection measures active
-                  </p>
-                  <Badge className="bg-green-100 text-green-800">Compliant</Badge>
-                </div>
+          <TabsContent value="security">
+            <div className="flex items-center justify-center p-12 bg-white border border-slate-200 rounded-md border-dashed">
+              <div className="text-center">
+                <Shield className="h-8 w-8 text-slate-300 mx-auto" />
+                <p className="mt-2 text-sm text-slate-500">Security settings are managed by your organization administrator.</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

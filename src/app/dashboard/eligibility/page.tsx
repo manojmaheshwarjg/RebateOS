@@ -17,7 +17,8 @@ import {
     Settings2,
     Upload,
     XCircle,
-    Zap
+    Zap,
+    Users
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import NewClaimForm from '@/components/new-claim-form';
@@ -45,13 +46,11 @@ export default function EligibilityPage() {
     const handleRunRules = async () => {
         setIsRunningRules(true);
         setRuleProgress(0);
-
         // Simulate rule execution progress
         for (let i = 0; i <= 100; i += 10) {
             await new Promise(resolve => setTimeout(resolve, 200));
             setRuleProgress(i);
         }
-
         setIsRunningRules(false);
         toast({
             title: 'Rule Execution Complete',
@@ -60,188 +59,129 @@ export default function EligibilityPage() {
     };
 
     return (
-        <div className="space-y-4">
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 text-yellow-500" />
-                            <span className="text-sm text-muted-foreground">Pending</span>
-                        </div>
-                        <p className="text-2xl font-bold">{stats.pending}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            <span className="text-sm text-muted-foreground">Approved</span>
-                        </div>
-                        <p className="text-2xl font-bold">{stats.approved}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-2">
-                            <XCircle className="h-4 w-4 text-red-500" />
-                            <span className="text-sm text-muted-foreground">Rejected</span>
-                        </div>
-                        <p className="text-2xl font-bold">{stats.rejected}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            <span className="text-sm text-muted-foreground">Flagged (340B)</span>
-                        </div>
-                        <p className="text-2xl font-bold">{stats.flagged}</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Actions Bar */}
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <Button
-                        onClick={handleRunRules}
-                        disabled={isRunningRules}
-                        className="bg-primary"
-                    >
-                        {isRunningRules ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Running Rules...
-                            </>
-                        ) : (
-                            <>
-                                <Zap className="mr-2 h-4 w-4" />
-                                Run Eligibility Rules
-                            </>
-                        )}
-                    </Button>
-                    <Dialog open={showRulesConfig} onOpenChange={setShowRulesConfig}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <Settings2 className="h-4 w-4" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Eligibility Engine Settings</DialogTitle>
-                                <DialogDescription>
-                                    Configure automated eligibility checking
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>Auto-Run Eligibility Rules</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Automatically check new claims
-                                        </p>
+        <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+                <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">Eligibility Engine</h1>
+                        <p className="text-sm text-slate-500">Automated claim validation and 340B qualification.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="flex gap-2 mr-4 border-r border-slate-200 pr-4">
+                            <Dialog open={showRulesConfig} onOpenChange={setShowRulesConfig}>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-9 text-slate-600 hover:text-slate-900">
+                                        <Settings2 className="mr-2 h-4 w-4" /> Config
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Eligibility Settings</DialogTitle>
+                                        <DialogDescription>Configure automated check rules.</DialogDescription>
+                                    </DialogHeader>
+                                    {/* Config content */}
+                                    <div className="space-y-4 py-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Auto-Run Rules</Label>
+                                            <Switch checked={autoEligibility} onCheckedChange={setAutoEligibility} />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label>340B Duplicate Check</Label>
+                                            <Switch checked={duplicateCheck340B} onCheckedChange={setDuplicateCheck340B} />
+                                        </div>
                                     </div>
-                                    <Switch
-                                        checked={autoEligibility}
-                                        onCheckedChange={setAutoEligibility}
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>340B Duplicate Discount Check</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Flag potential 340B/Medicaid conflicts
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={duplicateCheck340B}
-                                        onCheckedChange={setDuplicateCheck340B}
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={() => setShowRulesConfig(false)}>
-                                    Save Settings
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-                <div className="flex gap-2">
-                    <Dialog open={isBulkImportDialogOpen} onOpenChange={setIsBulkImportDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline">
-                                <Upload className="mr-2 h-4 w-4" />
-                                Bulk Import
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Bulk Import Claims</DialogTitle>
-                            </DialogHeader>
-                            <BulkClaimImportForm onImportComplete={() => setIsBulkImportDialogOpen(false)} />
-                        </DialogContent>
-                    </Dialog>
-
-                    <Dialog open={isNewClaimDialogOpen} onOpenChange={setIsNewClaimDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                New Claim
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create New Claim</DialogTitle>
-                            </DialogHeader>
-                            <NewClaimForm onClaimAdded={() => setIsNewClaimDialogOpen(false)} />
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
-
-            {/* Rule Progress Bar */}
-            {isRunningRules && (
-                <Card>
-                    <CardContent className="pt-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span>Processing claims...</span>
-                                <span>{ruleProgress}%</span>
-                            </div>
-                            <Progress value={ruleProgress} />
+                                    <DialogFooter><Button onClick={() => setShowRulesConfig(false)}>Save</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
-                    </CardContent>
-                </Card>
-            )}
+                        <Button
+                            onClick={handleRunRules}
+                            disabled={isRunningRules}
+                            className="bg-indigo-600 text-white hover:bg-indigo-700 h-9 shadow-sm border border-indigo-700"
+                        >
+                            {isRunningRules ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</> : <><Zap className="mr-2 h-4 w-4" /> Run Rules</>}
+                        </Button>
+                    </div>
+                </div>
+            </header>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Eligibility Queue</CardTitle>
-                            <CardDescription>Manage the eligibility queue and review claims that are pending review.</CardDescription>
-                        </div>
+            <main className="container mx-auto px-6 py-8 space-y-6">
+                {/* Stats */}
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Card className="rounded-md border-slate-200 shadow-none">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Loader2 className="h-4 w-4 text-amber-500" />
+                                <span className="text-sm font-medium text-slate-500">Pending Review</span>
+                            </div>
+                            <p className="text-2xl font-bold text-slate-900">{stats.pending}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="rounded-md border-slate-200 shadow-none">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                <span className="text-sm font-medium text-slate-500">Approved</span>
+                            </div>
+                            <p className="text-2xl font-bold text-slate-900">{stats.approved}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="rounded-md border-slate-200 shadow-none">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <XCircle className="h-4 w-4 text-rose-500" />
+                                <span className="text-sm font-medium text-slate-500">Rejected</span>
+                            </div>
+                            <p className="text-2xl font-bold text-slate-900">{stats.rejected}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="rounded-md text-amber-900 border-amber-200 bg-amber-50 shadow-none">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <span className="text-sm font-medium text-amber-800">340B Flagged</span>
+                            </div>
+                            <p className="text-2xl font-bold text-amber-900">{stats.flagged}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {isRunningRules && (
+                    <div className="w-full bg-slate-200 rounded-full h-1.5 mb-6">
+                        <div className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${ruleProgress}%` }}></div>
+                    </div>
+                )}
+
+                {/* Main Content */}
+                <div className="rounded-md border border-slate-200 bg-white shadow-none">
+                    <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                        <h3 className="font-semibold text-slate-900">Eligibility Queue</h3>
                         <div className="flex gap-2">
-                            {autoEligibility && (
-                                <Badge variant="outline" className="bg-green-50">
-                                    <CheckCircle2 className="mr-1 h-3 w-3 text-green-600" />
-                                    Auto-Check Enabled
-                                </Badge>
-                            )}
-                            {duplicateCheck340B && (
-                                <Badge variant="outline" className="bg-blue-50">
-                                    340B Shield Active
-                                </Badge>
-                            )}
+                            <Dialog open={isBulkImportDialogOpen} onOpenChange={setIsBulkImportDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-8 border-slate-300">
+                                        <Upload className="mr-2 h-3.5 w-3.5" /> Import CSV
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent><DialogHeader><DialogTitle>Bulk Import</DialogTitle></DialogHeader><BulkClaimImportForm onImportComplete={() => setIsBulkImportDialogOpen(false)} /></DialogContent>
+                            </Dialog>
+
+                            <Dialog open={isNewClaimDialogOpen} onOpenChange={setIsNewClaimDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button size="sm" className="h-8 bg-indigo-600 text-white hover:bg-indigo-700 border border-indigo-700 shadow-sm">
+                                        <PlusCircle className="mr-2 h-3.5 w-3.5" /> Manual Claim
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent><DialogHeader><DialogTitle>New Claim</DialogTitle></DialogHeader><NewClaimForm onClaimAdded={() => setIsNewClaimDialogOpen(false)} /></DialogContent>
+                            </Dialog>
                         </div>
                     </div>
-                </CardHeader>
-                <CardContent>
-                    <EligibilityQueueTable />
-                </CardContent>
-            </Card>
+                    <div className="p-0">
+                        {/* Reusing existing table component but it fits well structurally */}
+                        <EligibilityQueueTable />
+                    </div>
+                </div>
+            </main>
         </div>
     );
 }

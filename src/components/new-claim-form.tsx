@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,11 +10,8 @@ import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { v4 as uuidv4 } from 'uuid';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useLocalStorage } from '@/components/local-storage-provider';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
 import { Input } from './ui/input';
 
 interface Contract {
@@ -33,41 +30,44 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewClaimForm({ onClaimAdded }: { onClaimAdded?: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { firestore, user } = useFirebase();
+  const { db, userId } = useLocalStorage();
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  const contractsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'contracts'), where('vendorId', '==', user.uid));
-  }, [firestore, user]);
-
-  const { data: contracts, isLoading: isLoadingContracts } = useCollection<Contract>(contractsQuery);
+  useEffect(() => {
+    async function fetchContracts() {
+      setIsLoadingContracts(true);
+      try {
+        const data = await db.contracts
+          .where('vendor_id')
+          .equals(userId)
+          .toArray();
+        setContracts(data.map(c => ({ id: c.id, name: c.name })));
+      } catch (error) {
+        console.error('Error fetching contracts:', error);
+      }
+      setIsLoadingContracts(false);
+    }
+    fetchContracts();
+  }, [db, userId]);
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
-    if (!firestore || !user) {
-      toast({
-        title: 'Error',
-        description: 'Cannot save claim. Firebase not available or user not signed in.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
     setIsLoading(true);
     try {
-      const claimsCollection = collection(firestore, 'claims');
-      const newClaim = {
-        id: uuidv4(),
-        vendorId: user.uid,
-        claimDate: new Date().toISOString(),
+      await db.claims.add({
+        id: generateId(),
+        vendor_id: userId,
+        contract_id: data.contractId,
+        claim_date: getCurrentTimestamp(),
+        amount: data.claimAmount,
         status: 'pending-review',
-        ...data
-      };
-      
-      addDocumentNonBlocking(claimsCollection, newClaim);
+        details: data.details,
+        created_at: getCurrentTimestamp(),
+      });
 
       toast({
         title: 'Success',
@@ -115,17 +115,17 @@ export default function NewClaimForm({ onClaimAdded }: { onClaimAdded?: () => vo
           )}
         />
         <FormField
-            control={form.control}
-            name="claimAmount"
-            render={({field}) => (
-                <FormItem>
-                    <FormLabel>Claim Amount</FormLabel>
-                    <FormControl>
-                        <Input type="number" placeholder="Enter the amount" {...field} />
-                    </FormControl>
-                    <FormMessage/>
-                </FormItem>
-            )}
+          control={form.control}
+          name="claimAmount"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Claim Amount</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter the amount" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
         <FormField
           control={form.control}
@@ -141,10 +141,10 @@ export default function NewClaimForm({ onClaimAdded }: { onClaimAdded?: () => vo
           )}
         />
         <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Claim
-            </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading ? 'Creating...' : 'Create Claim'}
+          </Button>
         </div>
       </form>
     </Form>

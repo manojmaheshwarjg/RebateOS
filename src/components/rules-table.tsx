@@ -7,9 +7,8 @@ import {
     TableRow,
     TableCell,
 } from '@/components/ui/table';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, getDocs, where, doc, deleteDoc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 import { Skeleton } from './ui/skeleton';
 import { Badge } from './ui/badge';
 import { useState, useEffect } from 'react';
@@ -34,54 +33,62 @@ interface RebateRule {
     eligibilityCriteria: string;
 }
 
-interface Contract {
-    id: string;
-    name: string;
-}
-
 interface EnrichedRebateRule extends RebateRule {
     contractName: string;
 }
 
 export default function RulesTable() {
-    const { firestore, user } = useFirebase();
+    const { db, userId } = useLocalStorage();
     const { toast } = useToast();
     const [enrichedRules, setEnrichedRules] = useState<EnrichedRebateRule[]>([]);
     const [rulesLoading, setRulesLoading] = useState(true);
     const [editingRule, setEditingRule] = useState<RebateRule | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-    const contractsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'contracts'), where('vendorId', '==', user.uid));
-    }, [firestore, user]);
-
-    const { data: contracts, isLoading: contractsLoading } = useCollection<Contract>(contractsQuery);
-
-    const rulesQuery = useMemoFirebase(() => {
-        if (!firestore || !contracts || contracts.length === 0) return null;
-        const contractIds = contracts.map(c => c.id);
-        if (contractIds.length === 0) return null;
-        // Firestore 'in' queries are limited to 30 items. 
-        // For a production app with more contracts, this would need pagination or a different data model.
-        return query(collection(firestore, 'rebate_rules'), where('contractId', 'in', contractIds.slice(0, 30)));
-    }, [firestore, contracts]);
-
-    const { data: rules, isLoading: areRulesLoading } = useCollection<RebateRule>(rulesQuery);
-
     useEffect(() => {
-        setRulesLoading(contractsLoading || areRulesLoading);
-        if (rules && contracts) {
-            const contractMap = new Map(contracts.map(c => [c.id, c.name]));
-            const newEnrichedRules = rules.map(rule => ({
-                ...rule,
-                contractName: contractMap.get(rule.contractId) || 'Unknown Contract',
-            }));
-            setEnrichedRules(newEnrichedRules);
-        } else if (!contractsLoading && !areRulesLoading) {
-            setEnrichedRules([]);
+        async function fetchRules() {
+            setRulesLoading(true);
+
+            try {
+                // Fetch all rebate rules
+                const rules = await db.rebate_rules.toArray();
+
+                // Get unique contract IDs
+                const contractIds = [...new Set(rules.map(r => r.contract_id))];
+
+                // Fetch contracts in bulk
+                const contracts = await db.contracts.bulkGet(contractIds);
+
+                // Create a map for quick lookup
+                const contractMap = new Map(
+                    contracts.filter(Boolean).map(c => [c!.id, c!])
+                );
+
+                // Enrich rules with contract names
+                const mappedRules = rules.map((rule: any) => ({
+                    id: rule.id,
+                    contractId: rule.contract_id,
+                    ruleType: rule.type,
+                    ruleDescription: rule.description,
+                    eligibilityCriteria: rule.criteria?.text || JSON.stringify(rule.criteria),
+                    contractName: contractMap.get(rule.contract_id)?.name || 'Unknown Contract',
+                }));
+
+                setEnrichedRules(mappedRules);
+            } catch (error) {
+                console.error('Error fetching rules:', error);
+                toast({
+                    title: 'Error',
+                    description: 'Failed to load rebate rules.',
+                    variant: 'destructive',
+                });
+            } finally {
+                setRulesLoading(false);
+            }
         }
-    }, [rules, contracts, contractsLoading, areRulesLoading]);
+
+        fetchRules();
+    }, [db, toast, isEditDialogOpen]); // Re-fetch when dialog closes (edit/add might have happened)
 
     const handleEdit = (rule: RebateRule) => {
         setEditingRule(rule);
@@ -89,11 +96,12 @@ export default function RulesTable() {
     };
 
     const handleDelete = async (ruleId: string) => {
-        if (!firestore) return;
         if (!confirm('Are you sure you want to delete this rule?')) return;
 
         try {
-            await deleteDoc(doc(firestore, 'rebate_rules', ruleId));
+            await db.rebate_rules.delete(ruleId);
+
+            setEnrichedRules(prev => prev.filter(r => r.id !== ruleId));
             toast({
                 title: 'Success',
                 description: 'Rule deleted successfully.',
@@ -118,7 +126,7 @@ export default function RulesTable() {
             </div>
         );
     }
-    
+
     if (enrichedRules.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
@@ -137,8 +145,8 @@ export default function RulesTable() {
                     <DialogHeader>
                         <DialogTitle>Edit Rebate Rule</DialogTitle>
                     </DialogHeader>
-                    <RuleBuilderForm 
-                        onRuleAdded={() => setIsEditDialogOpen(false)} 
+                    <RuleBuilderForm
+                        onRuleAdded={() => setIsEditDialogOpen(false)}
                         existingRule={editingRule}
                     />
                 </DialogContent>

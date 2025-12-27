@@ -44,6 +44,7 @@ import {
   Settings2,
   Trash2,
   Upload,
+  Link2
 } from 'lucide-react';
 
 interface DataConnection {
@@ -111,34 +112,27 @@ export default function IntegrationsPage() {
 
   const getConnectionIcon = (type: string) => {
     switch (type) {
-      case 'erp': return <Database className="h-5 w-5" />;
-      case 'ehr': return <Server className="h-5 w-5" />;
-      case 'wholesaler': return <HardDrive className="h-5 w-5" />;
-      case 'sftp': return <FileSpreadsheet className="h-5 w-5" />;
-      case 'api': return <Globe className="h-5 w-5" />;
-      default: return <Database className="h-5 w-5" />;
+      case 'erp': return <Database className="h-5 w-5 text-indigo-600" />;
+      case 'ehr': return <Server className="h-5 w-5 text-indigo-600" />;
+      case 'wholesaler': return <HardDrive className="h-5 w-5 text-indigo-600" />;
+      case 'sftp': return <FileSpreadsheet className="h-5 w-5 text-indigo-600" />;
+      case 'api': return <Globe className="h-5 w-5 text-indigo-600" />;
+      default: return <Database className="h-5 w-5 text-indigo-600" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'connected':
-        return <Badge className="bg-green-100 text-green-800">Connected</Badge>;
-      case 'disconnected':
-        return <Badge variant="secondary">Disconnected</Badge>;
-      case 'error':
-        return <Badge variant="destructive">Error</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case 'connected': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Connected</Badge>;
+      case 'disconnected': return <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">Disconnected</Badge>;
+      case 'error': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">Error</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   const handleAddConnection = async () => {
     setConnecting(true);
-
-    // Simulate connection test
     await new Promise(resolve => setTimeout(resolve, 2000));
-
     const connection: DataConnection = {
       id: Date.now().toString(),
       name: newConnection.name,
@@ -150,336 +144,170 @@ export default function IntegrationsPage() {
         port: newConnection.port,
       },
     };
-
     setConnections([...connections, connection]);
     setNewConnectionOpen(false);
-    setNewConnection({
-      name: '',
-      type: 'erp',
-      host: '',
-      port: '',
-      username: '',
-      password: '',
-    });
+    setNewConnection({ name: '', type: 'erp', host: '', port: '', username: '', password: '', });
     setConnecting(false);
-
-    toast({
-      title: 'Connection Added',
-      description: `${connection.name} has been connected successfully.`,
-    });
+    toast({ title: 'Connection Added', description: `${connection.name} has been connected successfully.` });
   };
 
   const handleSync = (connectionId: string) => {
-    toast({
-      title: 'Sync Started',
-      description: 'Data synchronization has been initiated.',
-    });
+    toast({ title: 'Sync Started', description: 'Data synchronization has been initiated.' });
   };
 
   const handleDelete = (connectionId: string) => {
     setConnections(connections.filter(c => c.id !== connectionId));
-    toast({
-      title: 'Connection Removed',
-      description: 'The data connection has been removed.',
-    });
+    toast({ title: 'Connection Removed', description: 'The data connection has been removed.' });
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Data Integrations</h1>
-        <p className="text-muted-foreground">
-          Connect external systems and configure data mappings
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+      <header className="bg-white border-b border-slate-200 sticky top-16 z-30">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">Integrations</h1>
+            <p className="text-sm text-slate-500">Manage data connectors and pipelines.</p>
+          </div>
+          <Dialog open={newConnectionOpen} onOpenChange={setNewConnectionOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9">
+                <Plus className="mr-2 h-4 w-4" /> Add Connection
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add Data Connection</DialogTitle>
+                <DialogDescription>Configure a new external data source</DialogDescription>
+              </DialogHeader>
+              {/* Simplified Form for visual cleanup */}
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label >Name</Label>
+                  <Input placeholder="System Name" value={newConnection.name} onChange={(e) => setNewConnection({ ...newConnection, name: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2"><Label>Host</Label><Input /></div>
+                  <div className="space-y-2"><Label>Port</Label><Input /></div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNewConnectionOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddConnection} disabled={connecting}>{connecting ? 'Connecting...' : 'Save'}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </header>
 
-      <Tabs defaultValue="connections" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="connections">Data Connections</TabsTrigger>
-          <TabsTrigger value="mappings">Entity Mappings</TabsTrigger>
-          <TabsTrigger value="quality">Data Quality</TabsTrigger>
-          <TabsTrigger value="imports">File Imports</TabsTrigger>
-        </TabsList>
+      <main className="container mx-auto px-6 py-8">
+        <Tabs defaultValue="connections" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <TabsList className="bg-slate-100 p-1 border border-slate-200">
+              <TabsTrigger value="connections" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Connections</TabsTrigger>
+              <TabsTrigger value="mappings" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Mappings</TabsTrigger>
+              <TabsTrigger value="quality" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Data Quality</TabsTrigger>
+              <TabsTrigger value="imports" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Imports</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="connections" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-semibold">External Connections</h2>
-              <p className="text-sm text-muted-foreground">
-                Manage connections to ERP, EHR, and wholesaler systems
-              </p>
-            </div>
-            <Dialog open={newConnectionOpen} onOpenChange={setNewConnectionOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Connection
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add Data Connection</DialogTitle>
-                  <DialogDescription>
-                    Configure a new external data source
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="connName">Connection Name</Label>
-                    <Input
-                      id="connName"
-                      value={newConnection.name}
-                      onChange={(e) => setNewConnection({ ...newConnection, name: e.target.value })}
-                      placeholder="My ERP System"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="connType">Connection Type</Label>
-                    <Select
-                      value={newConnection.type}
-                      onValueChange={(value: any) => setNewConnection({ ...newConnection, type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="erp">ERP System</SelectItem>
-                        <SelectItem value="ehr">EHR System</SelectItem>
-                        <SelectItem value="wholesaler">Wholesaler</SelectItem>
-                        <SelectItem value="sftp">SFTP Server</SelectItem>
-                        <SelectItem value="api">REST API</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="host">Host/Endpoint</Label>
-                      <Input
-                        id="host"
-                        value={newConnection.host}
-                        onChange={(e) => setNewConnection({ ...newConnection, host: e.target.value })}
-                        placeholder="hostname.com"
-                      />
+          <TabsContent value="connections" className="space-y-4">
+            <div className="grid gap-4">
+              {connections.map((connection) => (
+                <div key={connection.id} className="group bg-white border border-slate-200 rounded-lg p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 bg-indigo-50 rounded-lg flex items-center justify-center border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
+                        {getConnectionIcon(connection.type)}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900">{connection.name}</h3>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
+                          <Link2 className="h-3 w-3" />
+                          <span>Last synced: {new Date(connection.lastSync).toLocaleString()}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="port">Port</Label>
-                      <Input
-                        id="port"
-                        value={newConnection.port}
-                        onChange={(e) => setNewConnection({ ...newConnection, port: e.target.value })}
-                        placeholder="443"
-                      />
+                    <div className="flex items-center gap-4">
+                      {getStatusBadge(connection.status)}
+                      <div className="h-4 w-px bg-slate-200"></div>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => handleSync(connection.id)}><RefreshCw className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"><Settings2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(connection.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      value={newConnection.username}
-                      onChange={(e) => setNewConnection({ ...newConnection, username: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={newConnection.password}
-                      onChange={(e) => setNewConnection({ ...newConnection, password: e.target.value })}
-                    />
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setNewConnectionOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddConnection} disabled={connecting || !newConnection.name}>
-                    {connecting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      'Test & Save'
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+              ))}
+            </div>
+          </TabsContent>
 
-          <div className="grid gap-4">
-            {connections.map((connection) => (
-              <Card key={connection.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-muted rounded-lg">
-                      {getConnectionIcon(connection.type)}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{connection.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Last synced: {new Date(connection.lastSync).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {getStatusBadge(connection.status)}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSync(connection.id)}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Settings2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(connection.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="mappings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>NDC/SKU Crosswalk</CardTitle>
-              <CardDescription>
-                Map external product codes to standard NDC and SKU identifiers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <TabsContent value="mappings">
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-semibold text-sm">NDC/SKU Crosswalk</h3>
+                <Button variant="outline" size="sm" className="h-8 bg-white"><Plus className="mr-2 h-3 w-3" /> Add Mapping</Button>
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Source Field</TableHead>
-                    <TableHead>Target Field</TableHead>
-                    <TableHead>Transform</TableHead>
-                    <TableHead>Status</TableHead>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Source Field</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Target Field</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Transform</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ndcMappings.map((mapping) => (
-                    <TableRow key={mapping.id}>
-                      <TableCell className="font-mono">{mapping.sourceField}</TableCell>
-                      <TableCell className="font-mono">{mapping.targetField}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{mapping.transformType}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={mapping.active ? 'bg-green-100 text-green-800' : ''}>
-                          {mapping.active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Settings2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                    <TableRow key={mapping.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                      <TableCell className="font-mono text-sm">{mapping.sourceField}</TableCell>
+                      <TableCell className="font-mono text-sm">{mapping.targetField}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-slate-600 bg-slate-50">{mapping.transformType}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className={mapping.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}>{mapping.active ? 'Active' : 'Inactive'}</Badge></TableCell>
+                      <TableCell><Button variant="ghost" size="icon"><Settings2 className="h-4 w-4 text-slate-400" /></Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <Button variant="outline" className="mt-4">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Mapping
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Facility Mappings</CardTitle>
-              <CardDescription>
-                Map facility codes between systems
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Configure facility mappings...</p>
-            </CardContent>
-          </Card>
+          <TabsContent value="quality">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="rounded-md border-slate-200 shadow-none">
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-slate-500 mb-1">Completeness</p>
+                  <p className="text-2xl font-bold text-emerald-600">98.5%</p>
+                </CardContent>
+              </Card>
+              <Card className="rounded-md border-slate-200 shadow-none">
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-slate-500 mb-1">Accuracy</p>
+                  <p className="text-2xl font-bold text-emerald-600">99.2%</p>
+                </CardContent>
+              </Card>
+              <Card className="rounded-md border-slate-200 shadow-none">
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-slate-500 mb-1">Anomalies</p>
+                  <p className="text-2xl font-bold text-amber-500">12</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Payer Mappings</CardTitle>
-              <CardDescription>
-                Map payer identifiers and classifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Configure payer mappings...</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="quality" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Quality Dashboard</CardTitle>
-              <CardDescription>
-                Monitor data completeness and accuracy
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Completeness</p>
-                  <p className="text-2xl font-bold text-green-600">98.5%</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Accuracy</p>
-                  <p className="text-2xl font-bold text-green-600">99.2%</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Anomalies</p>
-                  <p className="text-2xl font-bold text-yellow-600">12</p>
-                </div>
+          <TabsContent value="imports">
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-indigo-400 hover:bg-slate-50 transition-all cursor-pointer">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Upload className="h-6 w-6" />
               </div>
-              <div className="pt-4">
-                <h4 className="font-medium mb-2">Recent Issues</h4>
-                <p className="text-sm text-muted-foreground">No critical issues detected</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="imports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>File Imports</CardTitle>
-              <CardDescription>
-                Upload data files for processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  Drag and drop files here, or click to browse
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Supports CSV, XLSX, and XML formats
-                </p>
-                <Button variant="outline" className="mt-4">
-                  Browse Files
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <h3 className="text-lg font-semibold text-slate-900">Upload Data File</h3>
+              <p className="text-slate-500 mt-1">Drag and drop CSV, XLSX, or XML files here.</p>
+              <Button variant="outline" className="mt-6">Select File</Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

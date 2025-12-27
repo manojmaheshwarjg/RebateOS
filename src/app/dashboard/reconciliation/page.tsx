@@ -36,6 +36,7 @@ import {
   Search,
   Upload,
   XCircle,
+  Filter
 } from 'lucide-react';
 
 interface RemittanceRecord {
@@ -146,33 +147,13 @@ export default function ReconciliationPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'matched':
-        return (
-          <Badge className="bg-green-100 text-green-800">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Matched
-          </Badge>
-        );
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200"><CheckCircle2 className="mr-1 h-3 w-3" />Matched</Badge>;
       case 'short_pay':
-        return (
-          <Badge variant="destructive">
-            <ArrowDownRight className="mr-1 h-3 w-3" />
-            Short Pay
-          </Badge>
-        );
+        return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200"><ArrowDownRight className="mr-1 h-3 w-3" />Short Pay</Badge>;
       case 'over_pay':
-        return (
-          <Badge className="bg-blue-100 text-blue-800">
-            <ArrowUpRight className="mr-1 h-3 w-3" />
-            Over Pay
-          </Badge>
-        );
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"><ArrowUpRight className="mr-1 h-3 w-3" />Over Pay</Badge>;
       case 'pending':
-        return (
-          <Badge variant="secondary">
-            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            Pending
-          </Badge>
-        );
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Pending</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -204,255 +185,163 @@ export default function ReconciliationPage() {
   const matchRate = (remittances.filter(r => r.status === 'matched').length / remittances.length) * 100;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Remittance Reconciliation</h1>
-        <p className="text-muted-foreground">
-          Match payments to claims and analyze variances
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">Financial Reconciliation</h1>
+            <p className="text-sm text-slate-500">Match payments to claims and analyze financial variances.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="h-9 border-slate-300" onClick={handleUploadRemittance} disabled={uploading}>
+              {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Upload Remittance
+            </Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 shadow-sm" onClick={handleAutoReconcile} disabled={reconciling}>
+              {reconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Auto-Reconcile
+            </Button>
+          </div>
+        </div>
+      </header>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Expected</span>
-            </div>
-            <p className="text-2xl font-bold">${totalExpected.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Received</span>
-            </div>
-            <p className="text-2xl font-bold">${totalReceived.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              {totalVariance < 0 ? (
-                <ArrowDownRight className="h-4 w-4 text-red-500" />
-              ) : (
-                <ArrowUpRight className="h-4 w-4 text-green-500" />
-              )}
-              <span className="text-sm text-muted-foreground">Variance</span>
-            </div>
-            <p className={`text-2xl font-bold ${totalVariance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-              ${Math.abs(totalVariance).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Match Rate</span>
-            </div>
-            <p className="text-2xl font-bold">{matchRate.toFixed(1)}%</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="remittances" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="remittances">Remittances</TabsTrigger>
-          <TabsTrigger value="variances">Variance Analysis</TabsTrigger>
-          <TabsTrigger value="forecast">Cash Forecast</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="remittances" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search remittances..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-64"
-                />
+      <main className="container mx-auto px-6 py-8">
+        <div className="grid gap-4 md:grid-cols-4 mb-6">
+          {/* Standardized Metric Cards */}
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Expected</span>
               </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="matched">Matched</SelectItem>
-                  <SelectItem value="short_pay">Short Pay</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleUploadRemittance} disabled={uploading}>
-                {uploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="mr-2 h-4 w-4" />
-                )}
-                Upload Remittance
-              </Button>
-              <Button onClick={handleAutoReconcile} disabled={reconciling}>
-                {reconciling ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Auto-Reconcile
-              </Button>
-            </div>
+              <p className="text-2xl font-bold text-slate-900">${totalExpected.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Received</span>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">${totalReceived.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                {totalVariance < 0 ? <ArrowDownRight className="h-4 w-4 text-rose-500" /> : <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
+                <span className="text-sm font-medium text-slate-500">Variance</span>
+              </div>
+              <p className={`text-2xl font-bold ${totalVariance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                ${Math.abs(totalVariance).toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Match Rate</span>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{matchRate.toFixed(1)}%</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="remittances" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <TabsList className="bg-slate-100 p-1 border border-slate-200">
+              <TabsTrigger value="remittances" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Remittances</TabsTrigger>
+              <TabsTrigger value="variances" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Variance Analysis</TabsTrigger>
+              <TabsTrigger value="forecast" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Cash Forecast</TabsTrigger>
+            </TabsList>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
+          <TabsContent value="remittances" className="space-y-4">
+            <div className="rounded-md border border-slate-200 bg-white overflow-hidden shadow-none">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+                <div className="flex-1 max-w-sm relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input placeholder="Search remittances..." className="pl-9 h-9 border-slate-300 bg-white" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                </div>
+                <Button variant="outline" size="sm" className="h-9 border-slate-300 bg-white">
+                  <Filter className="mr-2 h-4 w-4" /> Filter Status
+                </Button>
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Expected</TableHead>
-                    <TableHead className="text-right">Received</TableHead>
-                    <TableHead className="text-right">Variance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Claims</TableHead>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Date</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Expected</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Received</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Variance</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Claims</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {remittances.map((remittance) => (
-                    <TableRow key={remittance.id}>
-                      <TableCell className="font-medium">{remittance.vendorName}</TableCell>
-                      <TableCell>{new Date(remittance.remittanceDate).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        ${remittance.expectedAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        ${remittance.receivedAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className={`text-right ${remittance.variance < 0 ? 'text-red-600' : remittance.variance > 0 ? 'text-green-600' : ''}`}>
+                    <TableRow key={remittance.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                      <TableCell className="font-medium text-slate-900">{remittance.vendorName}</TableCell>
+                      <TableCell className="text-sm text-slate-500">{new Date(remittance.remittanceDate).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right text-sm">${remittance.expectedAmount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-sm">${remittance.receivedAmount.toLocaleString()}</TableCell>
+                      <TableCell className={`text-right text-sm font-medium ${remittance.variance < 0 ? 'text-rose-600' : remittance.variance > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
                         {remittance.variance !== 0 && (remittance.variance > 0 ? '+' : '')}
                         ${remittance.variance.toLocaleString()}
-                        {remittance.variancePercent !== 0 && (
-                          <span className="text-xs ml-1">
-                            ({remittance.variancePercent > 0 ? '+' : ''}{remittance.variancePercent.toFixed(1)}%)
-                          </span>
-                        )}
                       </TableCell>
                       <TableCell>{getStatusBadge(remittance.status)}</TableCell>
-                      <TableCell className="text-right">{remittance.claimsCount}</TableCell>
+                      <TableCell className="text-right text-sm">{remittance.claimsCount}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">View</Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <TabsContent value="variances" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Variance Analysis</CardTitle>
-              <CardDescription>
-                Identify and resolve payment discrepancies
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <TabsContent value="variances" className="space-y-4">
+            <div className="rounded-md border border-slate-200 bg-white overflow-hidden shadow-none">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Claim ID</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Expected</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Variance</TableHead>
-                    <TableHead>Reason</TableHead>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Claim ID</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Product</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Expected</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Paid</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Variance</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Reason</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {variances.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono">{item.claimId}</TableCell>
-                      <TableCell>{item.product}</TableCell>
-                      <TableCell className="text-right">${item.expectedAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${item.paidAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right text-red-600">
+                    <TableRow key={item.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                      <TableCell className="font-mono text-sm text-slate-600">{item.claimId}</TableCell>
+                      <TableCell className="text-slate-900 font-medium">{item.product}</TableCell>
+                      <TableCell className="text-right text-sm">${item.expectedAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-sm">${item.paidAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right text-rose-600 font-medium text-sm">
                         ${item.variance.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{item.reason}</Badge>
+                        <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">{item.reason}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="outline" size="sm">
-                          Dispute
-                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50">Dispute</Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="forecast" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cash Flow Forecast</CardTitle>
-              <CardDescription>
-                Predicted rebate payments based on historical patterns
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Next 30 Days</p>
-                  <p className="text-2xl font-bold">$425,000</p>
-                  <p className="text-xs text-green-600">+12% vs last month</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Next 60 Days</p>
-                  <p className="text-2xl font-bold">$890,000</p>
-                  <p className="text-xs text-green-600">+8% vs last period</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Next 90 Days</p>
-                  <p className="text-2xl font-bold">$1,350,000</p>
-                  <p className="text-xs text-muted-foreground">Based on current accruals</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Confidence Level</span>
-                  <span>87%</span>
-                </div>
-                <Progress value={87} />
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                Forecast based on historical time-to-payment patterns and current approval rates.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

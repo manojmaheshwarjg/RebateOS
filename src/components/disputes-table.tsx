@@ -13,84 +13,91 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 import { Skeleton } from './ui/skeleton';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Dispute {
     id: string;
-    claimId: string;
-    vendorId: string;
-    disputeDate: string;
+    claim_id: string;
+    dispute_date: string;
     reason: string;
     status: 'open' | 'resolved' | 'closed';
-}
-
-interface Claim {
-    id: string;
-    details: string;
-}
-
-interface EnrichedDispute extends Dispute {
-    claimDetails: string;
+    claims: {
+        details: string;
+    } | null;
 }
 
 export default function DisputesTable() {
-    const { firestore, user } = useFirebase();
+    const { db, userId } = useLocalStorage();
     const { toast } = useToast();
-    const [enrichedDisputes, setEnrichedDisputes] = useState<EnrichedDispute[]>([]);
+    const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const disputesQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(collection(firestore, 'disputes'), where('vendorId', '==', user.uid));
-    }, [firestore, user]);
+    const fetchDisputes = async () => {
+        setIsLoading(true);
+        try {
+            // Fetch disputes
+            const disputesData = await db.disputes
+                .where('vendor_id')
+                .equals(userId)
+                .reverse()
+                .sortBy('dispute_date');
 
-    const { data: disputes, isLoading: disputesLoading } = useCollection<Dispute>(disputesQuery);
+            // Get unique claim IDs
+            const claimIds = [...new Set(disputesData.map(d => d.claim_id))];
 
-    const claimIds = useMemo(() => {
-        if (!disputes) return [];
-        // Firestore 'in' query is limited to 30 items.
-        return [...new Set(disputes.map(d => d.claimId))].slice(0, 30);
-    }, [disputes]);
-    
-    const claimsQuery = useMemoFirebase(() => {
-        if (!firestore || claimIds.length === 0) return null;
-        return query(collection(firestore, 'claims'), where('id', 'in', claimIds));
-    }, [firestore, claimIds]);
+            // Fetch claims in bulk
+            const claims = await db.claims.bulkGet(claimIds);
 
-    const { data: claims, isLoading: claimsLoading } = useCollection<Claim>(claimsQuery);
+            // Create a map for quick lookup
+            const claimMap = new Map(
+                claims.filter(Boolean).map(c => [c!.id, c!])
+            );
+
+            // Enrich disputes with claim details
+            const enrichedDisputes = disputesData.map(dispute => ({
+                ...dispute,
+                claims: claimMap.get(dispute.claim_id) ? { details: claimMap.get(dispute.claim_id)!.details } : null,
+            })) as Dispute[];
+
+            setDisputes(enrichedDisputes);
+        } catch (error) {
+            console.error('Error fetching disputes:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        setIsLoading(disputesLoading || claimsLoading);
-        if (disputes && claims) {
-            const claimMap = new Map(claims.map(c => [c.id, c.details]));
-            const newEnrichedDisputes = disputes.map(dispute => ({
-                ...dispute,
-                claimDetails: claimMap.get(dispute.claimId) || 'Unknown Claim',
-            }));
-            setEnrichedDisputes(newEnrichedDisputes);
-        } else if (!disputesLoading && !claimsLoading) {
-            setEnrichedDisputes([]);
-        }
-    }, [disputes, claims, disputesLoading, claimsLoading]);
-    
+        fetchDisputes();
+    }, [db, userId]);
 
-    const handleStatusUpdate = (disputeId: string, status: 'resolved' | 'closed') => {
-        if (!firestore) return;
-        const disputeRef = doc(firestore, 'disputes', disputeId);
-        updateDocumentNonBlocking(disputeRef, { status });
-        toast({
-            title: "Success",
-            description: `Dispute status updated to ${status}.`
-        });
+
+    const handleStatusUpdate = async (disputeId: string, status: 'resolved' | 'closed') => {
+        try {
+            await db.disputes.update(disputeId, { status });
+
+            toast({
+                title: "Success",
+                description: `Dispute status updated to ${status}.`
+            });
+
+            // Refresh the list
+            fetchDisputes();
+        } catch (error) {
+            console.error('Error updating dispute status:', error);
+            toast({
+                title: "Error",
+                description: "Failed to update dispute status.",
+                variant: "destructive"
+            });
+        }
     };
 
     if (isLoading) {
@@ -102,8 +109,8 @@ export default function DisputesTable() {
             </div>
         );
     }
-    
-    if (!enrichedDisputes || enrichedDisputes.length === 0) {
+
+    if (!disputes || disputes.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
                 <h3 className="text-lg font-semibold">No Active Disputes</h3>
@@ -126,10 +133,10 @@ export default function DisputesTable() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {enrichedDisputes.map((dispute) => (
+                {disputes.map((dispute) => (
                     <TableRow key={dispute.id}>
-                        <TableCell className="font-medium max-w-xs truncate">{dispute.claimDetails}</TableCell>
-                        <TableCell>{new Date(dispute.disputeDate).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-medium max-w-xs truncate">{dispute.claims?.details || 'Unknown Claim'}</TableCell>
+                        <TableCell>{new Date(dispute.dispute_date).toLocaleDateString()}</TableCell>
                         <TableCell className="max-w-xs truncate">{dispute.reason}</TableCell>
                         <TableCell>
                             <Badge variant={dispute.status === 'open' ? 'destructive' : 'secondary'}>
@@ -137,12 +144,12 @@ export default function DisputesTable() {
                             </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                             <DropdownMenu>
+                            <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={dispute.status !== 'open'}>
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
+                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={dispute.status !== 'open'}>
+                                        <span className="sr-only">Open menu</span>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => handleStatusUpdate(dispute.id, 'resolved')}>

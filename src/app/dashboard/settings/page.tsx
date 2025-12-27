@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { updateProfile, updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { useFirestore, useAuth } from '@/firebase/provider';
+import { useLocalStorage } from '@/components/local-storage-provider';
 import { useUserProfile } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,19 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, Check } from 'lucide-react';
+import { Loader2, AlertCircle, Check, User, Shield, Bell } from 'lucide-react';
 
 export default function SettingsPage() {
-  const firestore = useFirestore();
-  const auth = useAuth();
+  const { db } = useLocalStorage();
   const userProfile = useUserProfile();
   const { toast } = useToast();
 
   // Profile state
   const [profileData, setProfileData] = useState({
-    name: userProfile.name,
-    email: userProfile.email,
-    organization: userProfile.organization,
+    full_name: userProfile?.full_name || '',
+    email: userProfile?.email || '',
+    organization: userProfile?.organization || '',
   });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -45,32 +42,11 @@ export default function SettingsPage() {
     setProfileSuccess(false);
 
     try {
-      // Update Firestore document
-      await updateDoc(doc(firestore, 'users', userProfile.uid), {
-        name: profileData.name,
-        organization: profileData.organization,
-        updatedAt: new Date(),
-      });
-
-      // Update Firebase Auth profile
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, {
-          displayName: profileData.name,
-        });
-
-        // Update email if changed
-        if (profileData.email !== userProfile.email) {
-          await updateEmail(auth.currentUser, profileData.email);
-          await updateDoc(doc(firestore, 'users', userProfile.uid), {
-            email: profileData.email,
-          });
-        }
-      }
-
+      await new Promise(resolve => setTimeout(resolve, 500));
       setProfileSuccess(true);
       toast({
-        title: 'Profile Updated',
-        description: 'Your profile has been updated successfully.',
+        title: 'Demo Mode',
+        description: 'Profile updates are not persisted in local storage mode.',
       });
     } catch (error: any) {
       console.error('Error updating profile:', error);
@@ -90,7 +66,6 @@ export default function SettingsPage() {
     setPasswordError(null);
     setPasswordLoading(true);
 
-    // Validation
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordError('New passwords do not match.');
       setPasswordLoading(false);
@@ -104,219 +79,224 @@ export default function SettingsPage() {
     }
 
     try {
-      if (!auth.currentUser || !auth.currentUser.email) {
-        throw new Error('No authenticated user found.');
-      }
-
-      // Re-authenticate user
-      const credential = EmailAuthProvider.credential(
-        auth.currentUser.email,
-        passwordData.currentPassword
-      );
-      await reauthenticateWithCredential(auth.currentUser, credential);
-
-      // Update password
-      await updatePassword(auth.currentUser, passwordData.newPassword);
-
-      // Clear form
+      await new Promise(resolve => setTimeout(resolve, 500));
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
-
       toast({
-        title: 'Password Changed',
-        description: 'Your password has been updated successfully.',
+        title: 'Demo Mode',
+        description: 'Password changes are not persisted in local storage mode.',
       });
     } catch (error: any) {
       console.error('Error changing password:', error);
-      const errorMessages: Record<string, string> = {
-        'auth/wrong-password': 'Current password is incorrect.',
-        'auth/weak-password': 'New password is too weak.',
-        'auth/requires-recent-login': 'Please sign out and sign in again before changing your password.',
-      };
-      setPasswordError(errorMessages[error.code] || 'Failed to change password.');
+      setPasswordError(error.message || 'Failed to change password.');
     } finally {
       setPasswordLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+      {/* Sticky Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-4">
+          <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">Configuration</h1>
+          <p className="text-sm text-slate-500">Manage user profile and security preferences.</p>
+        </div>
+      </header>
 
-      <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
+      <main className="container mx-auto px-6 py-8">
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="bg-white border border-slate-200 p-1 h-auto rounded-md">
+            <TabsTrigger value="profile" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Profile</TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Security</TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900 text-slate-500 px-4 py-2 h-9">Notifications</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update your personal information and organization details
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleProfileUpdate} className="space-y-4">
-                {profileSuccess && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <Check className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-600">
-                      Profile updated successfully!
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profileData.name}
-                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                      required
-                      disabled={profileLoading}
-                    />
+          <TabsContent value="profile" className="max-w-4xl">
+            <Card className="rounded-md shadow-none border border-slate-200 bg-white">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-4 px-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 border border-indigo-100 rounded-md">
+                    <User className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                      required
-                      disabled={profileLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="organization">Organization</Label>
-                    <Input
-                      id="organization"
-                      value={profileData.organization}
-                      onChange={(e) => setProfileData({ ...profileData, organization: e.target.value })}
-                      disabled={profileLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Input
-                      id="role"
-                      value={getRoleLabel(userProfile.role)}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Contact an administrator to change your role
-                    </p>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-slate-900">Personal Information</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Update your contact details and role.</CardDescription>
                   </div>
                 </div>
-                <Button type="submit" disabled={profileLoading}>
-                  {profileLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  {profileSuccess && (
+                    <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800">
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <AlertDescription>Profile updated successfully.</AlertDescription>
+                    </Alert>
                   )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name" className="text-xs font-semibold text-slate-500 uppercase">Full Name</Label>
+                      <Input
+                        id="full_name"
+                        value={profileData.full_name}
+                        onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
+                        required
+                        disabled={profileLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-xs font-semibold text-slate-500 uppercase">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profileData.email}
+                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                        required
+                        disabled={profileLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="organization" className="text-xs font-semibold text-slate-500 uppercase">Organization</Label>
+                      <Input
+                        id="organization"
+                        value={profileData.organization}
+                        onChange={(e) => setProfileData({ ...profileData, organization: e.target.value })}
+                        disabled={profileLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role" className="text-xs font-semibold text-slate-500 uppercase">Role</Label>
+                      <Input
+                        id="role"
+                        value={getRoleLabel(userProfile.role)}
+                        disabled
+                        className="bg-slate-50 border-slate-200 text-slate-500"
+                      />
+                      <p className="text-[10px] text-slate-400">Role changes require administrator approval.</p>
+                    </div>
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <Button type="submit" disabled={profileLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-md h-9 shadow-sm">
+                      {profileLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="security" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>
-                Update your password to keep your account secure
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handlePasswordChange} className="space-y-4">
-                {passwordError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{passwordError}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                      required
-                      disabled={passwordLoading}
-                    />
+          <TabsContent value="security" className="max-w-2xl">
+            <Card className="rounded-md shadow-none border border-slate-200 bg-white">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-4 px-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 border border-indigo-100 rounded-md">
+                    <Shield className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                      required
-                      disabled={passwordLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                      required
-                      disabled={passwordLoading}
-                    />
+                  <div>
+                    <CardTitle className="text-base font-semibold text-slate-900">Password & Security</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Manage your login credentials.</CardDescription>
                   </div>
                 </div>
-                <Button type="submit" disabled={passwordLoading}>
-                  {passwordLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Changing...
-                    </>
-                  ) : (
-                    'Change Password'
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  {passwordError && (
+                    <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription>{passwordError}</AlertDescription>
+                    </Alert>
                   )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword" className="text-xs font-semibold text-slate-500 uppercase">Current Password</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        required
+                        disabled={passwordLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword" className="text-xs font-semibold text-slate-500 uppercase">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        required
+                        disabled={passwordLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-500 uppercase">Confirm New Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        required
+                        disabled={passwordLoading}
+                        className="border-slate-300 focus-visible:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <Button type="submit" disabled={passwordLoading} className="bg-slate-900 hover:bg-slate-800 text-white rounded-md h-9 shadow-sm">
+                      {passwordLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Password'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Configure how you receive notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Notification settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="notifications" className="max-w-4xl">
+            <Card className="rounded-md shadow-none border border-slate-200 bg-white">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-4 px-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-50 border border-indigo-100 rounded-md">
+                    <Bell className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold text-slate-900">Notification Preferences</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Configure how you receive alerts.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-center py-12 text-slate-500">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">Granular notification settings are being updated.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

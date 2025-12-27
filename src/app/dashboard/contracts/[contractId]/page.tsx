@@ -1,47 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
-import { useDoc } from '@/firebase/firestore/use-doc';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLocalStorage } from '@/components/local-storage-provider';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
-  AlertTriangle,
   ArrowRightLeft,
-  Calendar,
-  CheckCircle2,
-  Copy,
-  DollarSign,
+  ChevronRight,
+  Download,
   FileText,
-  Lightbulb,
-  Loader2,
-  Mail,
-  Package,
-  Phone,
-  RefreshCw,
-  Sparkles,
-  TrendingUp,
-  User,
+  LayoutDashboard,
+  Share2,
   Wand2,
+  CheckCircle2,
+  Activity,
+  Lightbulb,
+  Sparkles
 } from 'lucide-react';
-import { suggestTierOptimizations, type SuggestTierOptimizationsOutput } from '@/ai/flows/suggest-tier-optimizations';
-import { suggestSubstitutions, type SuggestSubstitutionsOutput } from '@/ai/flows/suggest-substitutions';
+import {
+  calculateContractHealth,
+  generateContractInsights,
+  generateTierOptimizations,
+  generateSubstitutionSuggestions,
+  type ContractHealthMetrics,
+  type OptimizationOpportunity,
+  type TierOptimizationResult,
+  type SubstitutionSuggestion,
+} from '@/lib/groq-ai';
+import { TierVisualization } from '@/components/tier-visualization';
+import { ContractTimeline } from '@/components/contract-timeline';
+import { cn } from '@/lib/utils';
+import { ContractDNAHeader } from '@/components/contract-dna-header';
+import { OpportunityDeck } from '@/components/opportunity-deck';
+import { ObligationTracker } from '@/components/obligation-tracker';
+import { QuickActionToolbar } from '@/components/quick-action-toolbar';
+import { InsightsLoadingState } from '@/components/insights-loading-state';
 
+// --- Interfaces --
 interface RebateTier {
   tierName: string;
   minThreshold: number;
@@ -70,679 +71,376 @@ interface VendorContact {
 interface Contract {
   id: string;
   name: string;
-  vendorId: string;
-  vendorName: string;
-  vendorContact: VendorContact;
-  contractType: 'GPO' | 'IDN' | 'Direct' | 'Wholesale' | 'Other';
-  contractNumber: string | null;
-  startDate: string;
-  endDate: string;
-  renewalTerms: string | null;
-  rebateTiers: RebateTier[];
+  vendor_id: string;
+  vendor_contact: VendorContact;
+  contract_type: 'GPO' | 'IDN' | 'Direct' | 'Wholesale' | 'Other';
+  contract_number: string | null;
+  start_date: string;
+  end_date: string;
+  renewal_terms: string | null;
+  rebate_tiers: RebateTier[];
   products: Product[];
-  paymentTerms: string;
-  submissionDeadline: string | null;
-  requiredDocumentation: string[];
-  eligibilityCriteria: string[];
-  exclusions: string[];
-  specialConditions: string[];
-  confidence: {
-    overall: number;
-    vendorInfo: number;
-    dates: number;
-    tiers: number;
-    products: number;
-  };
-  rawRebateRates: string;
-  rawProductList: string;
+  payment_terms: string;
+  special_conditions: string[];
   status: string;
   description: string;
-  contractFileUrl: string;
-  createdAt: string;
-  updatedAt: string;
+  contract_file_url: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function ContractDetailPage() {
   const { contractId } = useParams();
   const router = useRouter();
-  const { firestore } = useFirebase();
+  const { db } = useLocalStorage();
   const { toast } = useToast();
-  const [generatingRules, setGeneratingRules] = useState(false);
-  const [analyzingTiers, setAnalyzingTiers] = useState(false);
-  const [findingSubstitutions, setFindingSubstitutions] = useState(false);
-  const [tierOptimizations, setTierOptimizations] = useState<SuggestTierOptimizationsOutput | null>(null);
-  const [substitutionSuggestions, setSubstitutionSuggestions] = useState<SuggestSubstitutionsOutput | null>(null);
 
-  const contractRef = useMemoFirebase(() => {
-    if (!firestore || !contractId) return null;
-    return doc(firestore, 'contracts', contractId as string);
-  }, [firestore, contractId]);
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [healthMetrics, setHealthMetrics] = useState<ContractHealthMetrics | null>(null);
+  const [opportunities, setOpportunities] = useState<OptimizationOpportunity[]>([]);
 
-  const { data: contract, isLoading } = useDoc<Contract>(contractRef);
+  // Loading states
+  const [generatingInsights, setGeneratingInsights] = useState(false);
 
-  const handleGenerateRules = async () => {
-    if (!contract || !firestore) return;
-
-    setGeneratingRules(true);
+  // Handle Smart Extract (Re-processing)
+  const handleSmartExtract = async () => {
+    if (!contractId || !db) return;
 
     try {
-      const rulesCollection = collection(firestore, 'rebate_rules');
-      const generatedRules = [];
+      setIsLoading(true);
+      setGeneratingInsights(true);
+      toast({
+        title: 'Starting Smart Extraction',
+        description: 'Analyzing contract for obligations and terms...',
+      });
 
-      // Generate a rule for each rebate tier
-      for (const tier of contract.rebateTiers) {
-        const rule = {
-          name: `${contract.vendorName} - ${tier.tierName}`,
-          contractId: contract.id,
-          type: 'tier',
-          description: `Auto-generated from ${contract.contractType} contract with ${contract.vendorName}`,
-          criteria: {
-            minThreshold: tier.minThreshold,
-            maxThreshold: tier.maxThreshold,
-            rebatePercentage: tier.rebatePercentage,
-            rebateType: tier.rebateType,
-            applicableProducts: tier.applicableProducts,
-          },
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          source: 'ai-generated',
-        };
+      // 1. Find the primary file
+      const files = await db.contract_files.where('contract_id').equals(contractId as string).toArray();
+      const primaryFile = files[0]; // Simplification for now
 
-        const docRef = await addDoc(rulesCollection, rule);
-        generatedRules.push(docRef.id);
+      if (!primaryFile) {
+        throw new Error('No contract file found to process');
       }
 
-      toast({
-        title: 'Rules Generated',
-        description: `Created ${generatedRules.length} rebate rules from contract tiers.`,
-      });
+      // 2. Get the file blob
+      const fileBlobEntry = await db.file_blobs.get(primaryFile.id);
+      if (!fileBlobEntry || !fileBlobEntry.blob) {
+        throw new Error('File content not found in local storage');
+      }
 
-      router.push('/dashboard/rules');
-    } catch (error) {
-      console.error('Error generating rules:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate rules. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setGeneratingRules(false);
-    }
-  };
+      // 3. Convert to Base64
+      const reader = new FileReader();
+      reader.readAsDataURL(fileBlobEntry.blob);
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
 
-  const handleAnalyzeTiers = async () => {
-    if (!contract) return;
+        // 4. Trigger processing
+        const { triggerContractProcessing } = await import('@/app/actions/process-contract');
+        const result = await triggerContractProcessing(
+          primaryFile.id,
+          contractId as string,
+          primaryFile.file_name,
+          base64data
+        );
 
-    setAnalyzingTiers(true);
+        if (result.success) {
+          // Save Obligations to DB
+          const obligations = result.result?.structuredData?.financial?.obligations;
+          if (obligations && Array.isArray(obligations)) {
+            let count = 0;
+            for (const ob of obligations) {
+              await db.obligations.add({
+                id: crypto.randomUUID(),
+                contract_id: contractId as string,
+                title: ob.title,
+                description: ob.description,
+                due_date: ob.dueDate,
+                type: ob.type || 'other',
+                priority: ob.priority || 'medium',
+                recurrence: ob.recurrence,
+                status: 'pending',
+                created_at: new Date().toISOString()
+              });
+              count++;
+            }
+            toast({
+              title: 'Extraction Complete',
+              description: `Found ${result.fieldsExtracted} fields and added ${count} obligations.`,
+            });
+          } else {
+            toast({
+              title: 'Extraction Complete',
+              description: `Found ${result.fieldsExtracted} fields but no new obligations.`,
+            });
+          }
 
-    try {
-      // Prepare contract data for tier optimization
-      const contractTerms = JSON.stringify({
-        vendorName: contract.vendorName,
-        contractType: contract.contractType,
-        startDate: contract.startDate,
-        endDate: contract.endDate,
-        paymentTerms: contract.paymentTerms,
-      });
-
-      const currentTiers = JSON.stringify(contract.rebateTiers);
-
-      // Generate mock historical data based on tiers
-      const historicalData: Record<string, number> = {};
-      contract.rebateTiers.forEach((tier, index) => {
-        const baseVolume = tier.minThreshold * 1.5;
-        historicalData[`quarter_${index + 1}`] = baseVolume;
-      });
-
-      // Generate mock market trends
-      const marketTrends = JSON.stringify({
-        industryGrowth: '8%',
-        competitorRebates: 'Average 5-12%',
-        seasonalTrends: 'Q4 typically highest volume',
-        priceInflation: '3.5%',
-      });
-
-      const result = await suggestTierOptimizations({
-        historicalSalesData: JSON.stringify(historicalData),
-        marketTrends,
-        contractTerms,
-        currentTiers,
-      });
-
-      setTierOptimizations(result);
-
-      toast({
-        title: 'Tier Analysis Complete',
-        description: 'AI has generated optimization recommendations for your rebate tiers.',
-      });
-    } catch (error) {
-      console.error('Error analyzing tiers:', error);
-      toast({
-        title: 'Analysis Failed',
-        description: 'Could not complete tier optimization analysis. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setAnalyzingTiers(false);
-    }
-  };
-
-  const handleFindSubstitutions = async () => {
-    if (!contract || !contract.products || contract.products.length === 0) return;
-
-    setFindingSubstitutions(true);
-
-    try {
-      // Generate product usage data from contract products
-      const productUsage: Record<string, number> = {};
-      contract.products.forEach(product => {
-        productUsage[product.productName] = Math.floor(Math.random() * 1000) + 100;
-      });
-
-      // Generate contract terms with rebate info for each product
-      const contractTermsWithRebates = contract.products.map((product, index) => ({
-        product: product.productName,
-        ndc: product.ndc,
-        category: product.category,
-        rebate: contract.rebateTiers[0]?.rebatePercentage || 5,
-      }));
-
-      // Generate clinical equivalents mapping
-      const clinicalEquivalents: Record<string, string[]> = {};
-      contract.products.forEach(product => {
-        // Create mock equivalents for demonstration
-        if (product.category) {
-          clinicalEquivalents[product.productName] = [
-            `Generic ${product.productName}`,
-            `${product.category} Alternative`,
-          ];
+          // Refresh data
+          window.location.reload();
+        } else {
+          throw new Error(result.error);
         }
-      });
+      };
 
-      const result = await suggestSubstitutions({
-        productUsageData: JSON.stringify(productUsage),
-        contractTerms: JSON.stringify(contractTermsWithRebates),
-        clinicalEquivalents: JSON.stringify(clinicalEquivalents),
-      });
-
-      setSubstitutionSuggestions(result);
-
+    } catch (error: any) {
+      console.error('Smart Extract failed:', error);
       toast({
-        title: 'Substitution Analysis Complete',
-        description: `Found ${result.suggestions.length} potential substitution opportunities.`,
-      });
-    } catch (error) {
-      console.error('Error finding substitutions:', error);
-      toast({
-        title: 'Analysis Failed',
-        description: 'Could not complete substitution analysis. Please try again.',
         variant: 'destructive',
+        title: 'Extraction Failed',
+        description: error.message
       });
-    } finally {
-      setFindingSubstitutions(false);
+      setIsLoading(false);
+      setGeneratingInsights(false);
     }
   };
 
-  const getConfidenceBadge = (score: number) => {
-    if (score >= 90) return <Badge className="bg-green-100 text-green-800">High ({score}%)</Badge>;
-    if (score >= 70) return <Badge className="bg-yellow-100 text-yellow-800">Medium ({score}%)</Badge>;
-    return <Badge className="bg-red-100 text-red-800">Low ({score}%)</Badge>;
-  };
+  // 1. Data Fetching
+  useEffect(() => {
+    async function init() {
+      if (!contractId) return;
+      setIsLoading(true);
+      try {
+        const data = await db.contracts.get(contractId as string);
+        if (!data) { setIsLoading(false); return; }
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-1/2" />
-        <Skeleton className="h-4 w-1/4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-          <div className="space-y-6">
-            <Skeleton className="h-8 w-1/3" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-          <div>
-            <Skeleton className="h-[500px] w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+        // Extract fields (simplified for brevity)
+        const fields = await db.extracted_fields.where('contract_id').equals(contractId as string).toArray();
 
-  if (!contract) {
-    return <p>Contract not found.</p>;
-  }
+        const tiers: RebateTier[] = [];
+        const products: Product[] = [];
+        let payment = data.payment_terms || '';
+        let start = data.start_date;
+        let end = data.end_date;
+        let renewal = data.renewal_terms || null;
 
-  const isPdf = contract.contractFileUrl && contract.contractFileUrl.includes('.pdf');
+        if (fields) {
+          fields.forEach(f => {
+            if (f.field_name.startsWith('rebate_tier_') && f.value_json) {
+              const t = f.value_json;
+              tiers.push({
+                tierName: t.tierName,
+                minThreshold: t.minThreshold || 0,
+                maxThreshold: t.maxThreshold,
+                rebatePercentage: t.rebatePercentage || 0,
+                rebateType: t.calculationMethod?.includes('percent') ? 'percentage' : 'fixed',
+                applicableProducts: t.applicableProducts || []
+              });
+            }
+            if (f.field_name === 'product_list' && Array.isArray(f.value_json)) {
+              f.value_json.forEach((p: any) => products.push({
+                productName: p.productName,
+                ndc: p.ndc,
+                sku: p.sku,
+                category: p.category || 'Uncategorized',
+                unitPrice: null,
+                unitOfMeasure: p.packageSize
+              }));
+            }
+            if (f.field_name === 'payment_terms' && f.value_json) payment = `${f.value_json.frequency || ''} ${f.value_json.paymentMethod || ''}`;
+            if (f.field_name === 'effective_date' && f.value_date) start = f.value_date;
+            if (f.field_name === 'expiration_date' && f.value_date) end = f.value_date;
+            if (f.field_name === 'renewal_terms') renewal = f.value_text || null; // If we start extracting it as a separate field
+          });
+        }
+
+        const fullContract = {
+          ...data,
+          rebate_tiers: tiers.length ? tiers : (data.rebate_tiers || []),
+          products: products.length ? products : (data.products || []),
+          payment_terms: payment,
+          start_date: start,
+          end_date: end,
+          renewal_terms: renewal
+        } as Contract;
+
+        setContract(fullContract);
+
+        const cl = await db.claims.where('contract_id').equals(contractId as string).toArray();
+        const pu: any[] = [];
+        setHealthMetrics(await calculateContractHealth(fullContract, cl, pu));
+        setIsLoading(false);
+
+      } catch (e) { setIsLoading(false); }
+    }
+    init();
+  }, [contractId, db]);
+
+  // 2. AI Gen (Lazy)
+  useEffect(() => {
+    if (contract && healthMetrics && !generatingInsights) {
+      setGeneratingInsights(true);
+      const runAI = async () => {
+        try {
+          const cl = await db.claims.where('contract_id').equals(contractId as string).toArray();
+          const pu: any[] = []; // Purchases not yet in DB schema
+          const insights = await generateContractInsights(contract, healthMetrics, pu, cl);
+          setOpportunities(insights);
+        } catch (e) { } finally { setGeneratingInsights(false); }
+      };
+      runAI();
+    }
+  }, [contract, healthMetrics]);
+
+  if (isLoading) return <div className="p-8 container mx-auto"><Skeleton className="h-12 w-full mb-4" /><Skeleton className="h-64 w-full" /></div>;
+  if (!contract || !healthMetrics) return <div className="p-8">Contract Not Found</div>;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{contract.vendorName}</h1>
-          <p className="text-muted-foreground">{contract.description}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline">{contract.contractType}</Badge>
-            <Badge variant={contract.status === 'active' ? 'default' : 'secondary'}>
-              {contract.status}
-            </Badge>
-            {contract.contractNumber && (
-              <Badge variant="outline">#{contract.contractNumber}</Badge>
-            )}
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+
+      {/* 1. COMPACT HEADER */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-3">
+          {/* Breadcrumb & Meta */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="hover:text-slate-900 cursor-pointer" onClick={() => router.push('/dashboard/contracts')}>Contracts</span>
+              <ChevronRight className="h-3 w-3" />
+              <span>{contract.contract_number || 'Details'}</span>
+            </div>
+          </div>
+
+          {/* Main Title Row */}
+          <div className="flex items-end justify-between">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 leading-none mb-1.5 flex items-center gap-3">
+                  {contract.name}
+                  <Badge variant="outline" className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase",
+                    contract.status === 'active' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600"
+                  )}>
+                    {contract.status}
+                  </Badge>
+                </h1>
+                <p className="text-sm text-slate-500">
+                  <span className="font-medium text-slate-700">Analyzer Summary:</span> This agreement provides for tiered rebates up to 12% on surgical supplies.
+                </p>
+              </div>
+            </div>
+
+            <QuickActionToolbar
+              onReviewClick={() => router.push(`/dashboard/contracts/${contractId}/review`)}
+              onAnalyzeClick={handleSmartExtract}
+            />
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleAnalyzeTiers}
-            disabled={analyzingTiers || !contract.rebateTiers?.length}
-          >
-            {analyzingTiers ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <TrendingUp className="mr-2 h-4 w-4" />
-            )}
-            Optimize Tiers
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleFindSubstitutions}
-            disabled={findingSubstitutions || !contract.products?.length}
-          >
-            {findingSubstitutions ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowRightLeft className="mr-2 h-4 w-4" />
-            )}
-            Find Substitutions
-          </Button>
-          <Button variant="outline" onClick={handleGenerateRules} disabled={generatingRules}>
-            {generatingRules ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Wand2 className="mr-2 h-4 w-4" />
-            )}
-            Generate Rules
-          </Button>
-        </div>
-      </div>
+      </header>
 
-      {/* Confidence Indicator */}
-      {contract.confidence && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              AI Extraction Confidence
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Progress value={contract.confidence.overall} />
-              </div>
-              {getConfidenceBadge(contract.confidence.overall)}
-            </div>
-            <div className="grid grid-cols-4 gap-4 mt-3 text-xs">
-              <div>
-                <span className="text-muted-foreground">Vendor</span>
-                <p className="font-medium">{contract.confidence.vendorInfo}%</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Dates</span>
-                <p className="font-medium">{contract.confidence.dates}%</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Tiers</span>
-                <p className="font-medium">{contract.confidence.tiers}%</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Products</span>
-                <p className="font-medium">{contract.confidence.products}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <main className="container mx-auto px-6 py-6 space-y-6">
 
-      {/* AI Recommendations Section */}
-      {(tierOptimizations || substitutionSuggestions) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Tier Optimization Recommendations */}
-          {tierOptimizations && (
-            <Card className="border-blue-200 bg-blue-50/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-blue-800">
-                  <Lightbulb className="h-5 w-5" />
-                  Tier Optimization Recommendations
-                </CardTitle>
-                <CardDescription>
-                  AI-generated suggestions to improve your rebate tier structure
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium mb-2">Analysis</p>
-                  <p className="text-sm text-muted-foreground">
-                    {tierOptimizations.explanation}
-                  </p>
-                </div>
-                {tierOptimizations.optimizedTiers && (
-                  <div>
-                    <p className="text-sm font-medium mb-2">Suggested Optimized Tiers</p>
-                    <pre className="text-xs bg-white p-3 rounded-md overflow-auto max-h-48 border">
-                      {tierOptimizations.optimizedTiers}
-                    </pre>
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTierOptimizations(null)}
-                >
-                  Dismiss
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Substitution Suggestions */}
-          {substitutionSuggestions && substitutionSuggestions.suggestions.length > 0 && (
-            <Card className="border-green-200 bg-green-50/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-800">
-                  <ArrowRightLeft className="h-5 w-5" />
-                  Substitution Opportunities
-                </CardTitle>
-                <CardDescription>
-                  Product switches that could improve rebate performance
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {substitutionSuggestions.suggestions.map((suggestion, index) => (
-                  <div key={index} className="p-3 bg-white rounded-md border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline">{suggestion.originalProduct}</Badge>
-                      <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
-                      <Badge className="bg-green-100 text-green-800">
-                        {suggestion.suggestedSubstitute}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {suggestion.reasoning}
-                    </p>
-                    <p className="text-xs font-medium text-green-700">
-                      Estimated Savings: {suggestion.estimatedSavings}
-                    </p>
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSubstitutionSuggestions(null)}
-                >
-                  Dismiss
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column - Contract Details */}
+        {/* 2. COMMAND CENTER GRID (3 Columns) */}
+        {/* 2. COMMAND CENTER GRID */}
         <div className="space-y-6">
-          {/* Contract Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Contract Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Start Date</p>
-                  <p className="font-medium">{new Date(contract.startDate).toLocaleDateString()}</p>
+          {/* Top: DNA (Full Width) */}
+          <section>
+            <ContractDNAHeader contract={contract} healthMetrics={healthMetrics} />
+          </section>
+
+
+
+          <section className="min-h-[420px]">
+            {generatingInsights ? (
+              <InsightsLoadingState />
+            ) : (
+              <div className="grid grid-cols-12 gap-6 h-full">
+                {/* Left: Opportunities (8 cols) */}
+                <div className="col-span-12 lg:col-span-8 h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <h3 className="text-sm font-bold text-slate-900">Action Center</h3>
+                  </div>
+                  <OpportunityDeck
+                    opportunities={opportunities}
+                    isLoading={false} // Loading handled by parent now
+                    onViewActionPlan={(opp) => console.log('View plan', opp)}
+                    className="flex-1"
+                  />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">End Date</p>
-                  <p className="font-medium">{new Date(contract.endDate).toLocaleDateString()}</p>
+
+                {/* Right: Obligations (4 cols) */}
+                <div className="col-span-12 lg:col-span-4 h-full">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <h3 className="text-sm font-bold text-slate-900">Obligations</h3>
+                  </div>
+                  <ObligationTracker contractId={contractId as string} />
                 </div>
               </div>
-              {contract.renewalTerms && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Renewal Terms</p>
-                  <p className="font-medium">{contract.renewalTerms}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-sm text-muted-foreground">Payment Terms</p>
-                <p className="font-medium">{contract.paymentTerms}</p>
-              </div>
-              {contract.submissionDeadline && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Submission Deadline</p>
-                  <p className="font-medium">{contract.submissionDeadline}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            )}
+          </section>
+        </div>
 
-          {/* Vendor Contact */}
-          {contract.vendorContact && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Vendor Contact
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {contract.vendorContact.name && (
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{contract.vendorContact.name}</span>
-                    {contract.vendorContact.department && (
-                      <span className="text-muted-foreground">({contract.vendorContact.department})</span>
-                    )}
-                  </div>
-                )}
-                {contract.vendorContact.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${contract.vendorContact.email}`} className="text-primary hover:underline">
-                      {contract.vendorContact.email}
-                    </a>
-                  </div>
-                )}
-                {contract.vendorContact.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{contract.vendorContact.phone}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+        {/* 3. DETAILED TABS (Existing content below) */}
+        <div className="grid grid-cols-1">
+          <Tabs defaultValue="terms" className="w-full">
+            <div className="border-b border-slate-200 mb-4 bg-white px-2 rounded-t-lg">
+              <TabsList className="bg-transparent h-12 p-0 gap-8">
+                <TabsTrigger value="terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 px-0 h-full text-sm font-medium text-slate-500">Terms & Analysis</TabsTrigger>
+                <TabsTrigger value="products" className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 px-0 h-full text-sm font-medium text-slate-500">Product Scope</TabsTrigger>
+                <TabsTrigger value="performance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 px-0 h-full text-sm font-medium text-slate-500">Performance</TabsTrigger>
+              </TabsList>
+            </div>
 
-          {/* Rebate Tiers */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Rebate Tiers ({contract.rebateTiers?.length || 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {contract.rebateTiers && contract.rebateTiers.length > 0 ? (
+            <TabsContent value="terms" className="space-y-6">
+              <Card className="rounded-lg border-slate-200 shadow-sm">
+                <CardContent className="p-6">
+                  <TierVisualization
+                    tiers={contract.rebate_tiers}
+                    currentLikelyVolume={healthMetrics.totalVolume}
+                    currentTierName={healthMetrics.currentTierName}
+                  />
+                </CardContent>
+              </Card>
+              {/* ... (Existing table) ... */}
+              <Card className="rounded-lg shadow-sm border border-slate-200 overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Tier</TableHead>
-                      <TableHead>Threshold</TableHead>
-                      <TableHead>Rebate</TableHead>
-                      <TableHead>Type</TableHead>
+                    <TableRow className="bg-slate-50 hover:bg-slate-50 border-slate-200">
+                      <TableHead className="font-semibold text-slate-900 h-10">Tier Name</TableHead>
+                      <TableHead className="font-semibold text-slate-900 h-10 text-right">Min. Threshold</TableHead>
+                      <TableHead className="font-semibold text-slate-900 h-10 text-right">Rebate %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {contract.rebateTiers.map((tier, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{tier.tierName}</TableCell>
-                        <TableCell>
-                          ${tier.minThreshold.toLocaleString()}
-                          {tier.maxThreshold ? ` - $${tier.maxThreshold.toLocaleString()}` : '+'}
-                        </TableCell>
-                        <TableCell className="font-bold text-green-600">
-                          {tier.rebatePercentage}%
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{tier.rebateType}</Badge>
-                        </TableCell>
+                    {contract.rebate_tiers.map((t, i) => (
+                      <TableRow key={i} className="border-slate-100 hover:bg-slate-50/50">
+                        <TableCell className="font-medium text-slate-700">{t.tierName}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-slate-600">${t.minThreshold.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-bold text-indigo-700 bg-indigo-50/50">{t.rebatePercentage}%</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              ) : (
-                <p className="text-muted-foreground text-sm">No tiers extracted</p>
-              )}
-            </CardContent>
-          </Card>
+              </Card>
+            </TabsContent>
 
-          {/* Eligibility & Exclusions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Eligibility & Exclusions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {contract.eligibilityCriteria && contract.eligibilityCriteria.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Eligibility Criteria</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    {contract.eligibilityCriteria.map((criteria, i) => (
-                      <li key={i} className="text-muted-foreground">{criteria}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {contract.exclusions && contract.exclusions.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Exclusions</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    {contract.exclusions.map((exclusion, i) => (
-                      <li key={i} className="text-muted-foreground text-red-600">{exclusion}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {contract.requiredDocumentation && contract.requiredDocumentation.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Required Documentation</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    {contract.requiredDocumentation.map((doc, i) => (
-                      <li key={i} className="text-muted-foreground">{doc}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Products & Document */}
-        <div className="space-y-6">
-          {/* Products Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Products ({contract.products?.length || 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {contract.products && contract.products.length > 0 ? (
-                <div className="max-h-[300px] overflow-y-auto">
+            <TabsContent value="products">
+              {/* ... (Existing product table) ... */}
+              <Card className="rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div className="max-h-[600px] overflow-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>NDC</TableHead>
-                        <TableHead>Category</TableHead>
+                      <TableRow className="bg-slate-50 hover:bg-slate-50 border-slate-200">
+                        <TableHead className="font-bold text-slate-900 h-10">Product Name</TableHead>
+                        <TableHead className="font-bold text-slate-900 h-10">NDC / SKU</TableHead>
+                        <TableHead className="font-bold text-slate-900 h-10">Category</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {contract.products.map((product, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{product.productName}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {product.ndc || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{product.category}</Badge>
-                          </TableCell>
+                      {contract.products.map((p, i) => (
+                        <TableRow key={i} className="border-slate-100 hover:bg-slate-50/50">
+                          <TableCell className="font-medium text-slate-700">{p.productName}</TableCell>
+                          <TableCell className="font-mono text-xs text-slate-500">{p.ndc || p.sku}</TableCell>
+                          <TableCell className="text-slate-500 text-xs uppercase">{p.category}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No products extracted</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Contract Document */}
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle>Contract Document</CardTitle>
-            </CardHeader>
-            <CardContent className="min-h-[400px]">
-              {isPdf ? (
-                <iframe
-                  src={contract.contractFileUrl}
-                  width="100%"
-                  height="400"
-                  className="border rounded-md"
-                />
-              ) : (
-                <a
-                  href={contract.contractFileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  View Document
-                </a>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Raw Extracted Text */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Raw Extracted Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="rates">
-                <TabsList className="w-full">
-                  <TabsTrigger value="rates" className="flex-1">Rebate Rates</TabsTrigger>
-                  <TabsTrigger value="products" className="flex-1">Products</TabsTrigger>
-                </TabsList>
-                <TabsContent value="rates" className="mt-2">
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-32 whitespace-pre-wrap">
-                    {contract.rawRebateRates || 'No data'}
-                  </pre>
-                </TabsContent>
-                <TabsContent value="products" className="mt-2">
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-32 whitespace-pre-wrap">
-                    {contract.rawProductList || 'No data'}
-                  </pre>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-      </div>
+
+      </main>
     </div>
   );
 }

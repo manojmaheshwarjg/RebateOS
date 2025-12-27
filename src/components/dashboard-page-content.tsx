@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestore } from '@/firebase/provider';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 import {
   Card,
   CardContent,
@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DollarSign, Users, CreditCard, Activity, Bell, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
@@ -44,7 +43,7 @@ interface Notification {
 }
 
 export default function DashboardPageContent() {
-  const firestore = useFirestore();
+  const { db, userId } = useLocalStorage();
   const [chartData, setChartData] = useState<any[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -54,26 +53,40 @@ export default function DashboardPageContent() {
     async function fetchDashboardData() {
       try {
         // Fetch contracts count
-        const contractsSnap = await getDocs(collection(firestore, 'contracts'));
-        const contractsCount = contractsSnap.size;
+        const contractsCount = await db.contracts
+          .where('vendor_id')
+          .equals(userId)
+          .count();
 
         // Fetch claims count
-        const claimsSnap = await getDocs(collection(firestore, 'claims'));
-        const claimsCount = claimsSnap.size;
-        const pendingClaims = claimsSnap.docs.filter(
-          doc => doc.data().status === 'pending'
-        ).length;
+        const claimsCount = await db.claims
+          .where('vendor_id')
+          .equals(userId)
+          .count();
+
+        // Fetch pending claims count
+        const pendingClaimsCount = await db.claims
+          .where('vendor_id')
+          .equals(userId)
+          .and(claim => claim.status === 'pending-review')
+          .count();
 
         // Fetch accruals for total rebates
-        const accrualsSnap = await getDocs(collection(firestore, 'accruals'));
-        const totalRebates = accrualsSnap.docs.reduce(
-          (sum, doc) => sum + (doc.data().amount || 0), 0
-        );
+        const accruals = await db.accruals
+          .where('vendor_id')
+          .equals(userId)
+          .toArray();
+
+        const totalRebates = accruals.reduce((sum, item) => sum + (item.amount || 0), 0);
 
         // Fetch disputes for dispute rate
-        const disputesSnap = await getDocs(collection(firestore, 'disputes'));
+        const disputesCount = await db.disputes
+          .where('vendor_id')
+          .equals(userId)
+          .count();
+
         const disputeRate = claimsCount > 0
-          ? (disputesSnap.size / claimsCount) * 100
+          ? (disputesCount / claimsCount) * 100
           : 0;
 
         setStats({
@@ -81,7 +94,7 @@ export default function DashboardPageContent() {
           rebateChange: 20.1,
           activeContracts: contractsCount || 12,
           contractChange: 15.5,
-          pendingClaims: pendingClaims || 24,
+          pendingClaims: pendingClaimsCount || 24,
           claimChange: 8.2,
           disputeRate: disputeRate || 1.2,
           disputeChange: -0.5,
@@ -90,12 +103,12 @@ export default function DashboardPageContent() {
         // Generate notifications based on data
         const newNotifications: Notification[] = [];
 
-        if (pendingClaims > 20) {
+        if ((pendingClaimsCount || 0) > 20) {
           newNotifications.push({
             id: '1',
             type: 'warning',
             title: 'High Pending Claims',
-            message: `You have ${pendingClaims} claims awaiting review`,
+            message: `You have ${pendingClaimsCount} claims awaiting review`,
             timestamp: new Date(),
           });
         }
@@ -155,22 +168,22 @@ export default function DashboardPageContent() {
     }
 
     fetchDashboardData();
-  }, [firestore]);
+  }, [db, userId]);
 
   if (chartData.length === 0) {
     return (
-        <div className="flex flex-col gap-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
-                <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
-                <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
-                <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-                <Card><CardHeader><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-[200px] w-full" /></CardContent></Card>
-                <Card><CardHeader><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-[200px] w-full" /></CardContent></Card>
-            </div>
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
+          <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
+          <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
+          <Card><CardHeader className="pb-2"><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent><Skeleton className="h-8 w-1/3" /><Skeleton className="h-3 w-2/3 mt-1" /></CardContent></Card>
         </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card><CardHeader><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-[200px] w-full" /></CardContent></Card>
+          <Card><CardHeader><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3 mt-2" /></CardHeader><CardContent><Skeleton className="h-[200px] w-full" /></CardContent></Card>
+        </div>
+      </div>
     );
   }
 
@@ -283,31 +296,31 @@ export default function DashboardPageContent() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                <RechartsLineChart
-                    accessibilityLayer
-                    data={chartData}
-                    margin={{
-                    left: 12,
-                    right: 12,
-                    }}
-                >
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Line
-                    dataKey="total"
-                    type="monotone"
-                    stroke="var(--color-primary)"
-                    strokeWidth={2}
-                    dot={false}
-                    />
-                </RechartsLineChart>
+              <RechartsLineChart
+                accessibilityLayer
+                data={chartData}
+                margin={{
+                  left: 12,
+                  right: 12,
+                }}
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tickFormatter={(value) => value.slice(0, 3)}
+                />
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                <Line
+                  dataKey="total"
+                  type="monotone"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </RechartsLineChart>
             </ChartContainer>
           </CardContent>
         </Card>

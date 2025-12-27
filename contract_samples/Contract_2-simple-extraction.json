@@ -1,0 +1,159 @@
+{
+  "products": [
+    {
+      "productName": "Hip Systems",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per implant set",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "Hip SystemsHIP-2000 to HIP-2199Total hip replacement componentsPer implant set"
+    },
+    {
+      "productName": "Knee Systems",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per implant set",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "Knee SystemsKNEE-3000 to KNEE-3299Total/partial knee implantsPer implant set"
+    },
+    {
+      "productName": "Shoulder Arthroplasty Systems",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per implant set",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "ShoulderSHLD-3500 to SHLD-3699Shoulder arthroplasty systemsPer implant set"
+    },
+    {
+      "productName": "Spinal Fusion Systems",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per case",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "Spinal HardwareSPINE-4000 to SPINE-4499Spinal fusion systems, screws, rodsPer case"
+    },
+    {
+      "productName": "Trauma Fixation",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per case",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "Trauma FixationTRAUMA-4500 to TRAUMA-4799Plates, screws, nails for fracturesPer case"
+    },
+    {
+      "productName": "Orthopedic Bone Cement",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per unit",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Orthopedic Implants",
+      "sourceQuote": "Bone CementCEMENT-5000 to CEMENT-5099Orthopedic bone cementPer unit"
+    },
+    {
+      "productName": "Pacemakers",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per device",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "PacemakersPACE-6000 to PACE-6199Single/dual chamber pacemakersPer device"
+    },
+    {
+      "productName": "Implantable Cardioverter Defibrillators",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per device",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "ICDsICD-6200 to ICD-6399Implantable cardioverter defibrillatorsPer device"
+    },
+    {
+      "productName": "Pacing/Defibrillator Leads",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per lead",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "LeadsLEAD-6400 to LEAD-6599Pacing/defibrillator leadsPer lead"
+    },
+    {
+      "productName": "Drug-Eluting Stents",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per stent",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "Coronary StentsSTENT-7000 to STENT-7299Drug-eluting stents, bare metalPer stent"
+    },
+    {
+      "productName": "Mechanical/Tissue Valve Prostheses",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per valve",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "Heart ValvesVALVE-7300 to VALVE-7499Mechanical/tissue valve prosthesesPer valve"
+    },
+    {
+      "productName": "Left Ventricular Assist Device Parts",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per component",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Cardiovascular Devices",
+      "sourceQuote": "LVAD ComponentsLVAD-7500 to LVAD-7699Left ventricular assist device partsPer component"
+    },
+    {
+      "productName": "Laparoscopic Tools",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per instrument",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Surgical Instruments",
+      "sourceQuote": "Laparoscopic ToolsLAP-8000 to LAP-8499Minimally invasive instrumentsPer instrument"
+    },
+    {
+      "productName": "Robotic Surgery System Parts",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per component",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Surgical Instruments",
+      "sourceQuote": "Robotic ComponentsROBOT-9000 to ROBOT-9399Robotic surgery system partsPer component"
+    },
+    {
+      "productName": "Electrosurgical Energy Devices",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per unit",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Surgical Instruments",
+      "sourceQuote": "ElectrosurgicalELECTRO-9400 to ELECTRO-9599Energy devices, generatorsPer unit"
+    },
+    {
+      "productName": "Endoscopy Equipment",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per unit",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Surgical Instruments",
+      "sourceQuote": "EndoscopyENDO-9600 to ENDO-9799Scopes, cameras, accessoriesPer unit"
+    },
+    {
+      "productName": "Suture Materials",
+      "ndc": null,
+      "strength": null,
+      "packageSize": "Per box",
+      "manufacturer": "MedTech Devices Corporation",
+      "category": "Surgical Instruments",
+      "sourceQuote": "SuturesSUTURE-9800 to SUTURE-9999Various suture materialsPer box"
+    }
+  ],
+  "totalProducts": 20,
+  "extractionNotes": "Products extracted from Category A, B, and C product listings in the contract"
+}

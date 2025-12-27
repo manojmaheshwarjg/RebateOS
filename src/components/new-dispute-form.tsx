@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,11 +10,8 @@ import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { v4 as uuidv4 } from 'uuid';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 
 interface Claim {
   id: string;
@@ -31,42 +28,49 @@ type FormValues = z.infer<typeof formSchema>;
 export default function NewDisputeForm({ onDisputeAdded }: { onDisputeAdded?: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { firestore, user } = useFirebase();
+  const { db, userId } = useLocalStorage();
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [isLoadingClaims, setIsLoadingClaims] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
-  const claimsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'claims'), where('vendorId', '==', user.uid), where('status', '==', 'rejected'));
-  }, [firestore, user]);
-
-  const { data: claims, isLoading: isLoadingClaims } = useCollection<Claim>(claimsQuery);
+  useEffect(() => {
+    async function fetchClaims() {
+      setIsLoadingClaims(true);
+      try {
+        const data = await db.claims
+          .where('vendor_id')
+          .equals(userId)
+          .and(claim => claim.status === 'rejected')
+          .toArray();
+        setClaims(data.map(c => ({ id: c.id, details: c.details })));
+      } catch (error) {
+        console.error('Error fetching claims:', error);
+      } finally {
+        setIsLoadingClaims(false);
+      }
+    }
+    fetchClaims();
+  }, [db, userId]);
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
-    if (!firestore || !user) {
-      toast({
-        title: 'Error',
-        description: 'Cannot create dispute. Firebase not available or user not signed in.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
     setIsLoading(true);
     try {
-      const disputesCollection = collection(firestore, 'disputes');
       const newDispute = {
-        id: uuidv4(),
-        vendorId: user.uid,
-        disputeDate: new Date().toISOString(),
-        status: 'open',
-        resolutionDetails: '',
-        ...data
+        id: generateId(),
+        vendor_id: userId,
+        claim_id: data.claimId,
+        dispute_date: getCurrentTimestamp(),
+        status: 'open' as const,
+        resolution_details: '',
+        reason: data.reason,
+        created_at: getCurrentTimestamp(),
+        updated_at: getCurrentTimestamp(),
       };
-      
-      addDocumentNonBlocking(disputesCollection, newDispute);
+
+      await db.disputes.add(newDispute);
 
       toast({
         title: 'Success',
@@ -102,9 +106,9 @@ export default function NewDisputeForm({ onDisputeAdded }: { onDisputeAdded?: ()
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                   {claims && claims.length > 0 ? claims.map(claim => (
+                  {claims && claims.length > 0 ? claims.map(claim => (
                     <SelectItem key={claim.id} value={claim.id}>
-                      {claim.details}
+                      {claim.details || `Claim #${claim.id.substring(0, 8)}`}
                     </SelectItem>
                   )) : <SelectItem value="none" disabled>No rejected claims found</SelectItem>}
                 </SelectContent>
@@ -127,10 +131,10 @@ export default function NewDisputeForm({ onDisputeAdded }: { onDisputeAdded?: ()
           )}
         />
         <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading || !claims || claims.length === 0}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Dispute
-            </Button>
+          <Button type="submit" disabled={isLoading || !claims || claims.length === 0}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading ? 'Creating...' : 'Create Dispute'}
+          </Button>
         </div>
       </form>
     </Form>

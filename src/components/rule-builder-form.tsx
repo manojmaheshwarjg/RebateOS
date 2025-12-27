@@ -10,10 +10,8 @@ import { Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where, addDoc, doc, setDoc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId, getCurrentTimestamp } from '@/lib/local-storage/db';
+import { useLocalStorage } from '@/components/local-storage-provider';
 
 interface Contract {
   id: string;
@@ -21,11 +19,11 @@ interface Contract {
 }
 
 interface RebateRule {
-    id: string;
-    contractId: string;
-    ruleType: string;
-    ruleDescription: string;
-    eligibilityCriteria: string;
+  id: string;
+  contractId: string;
+  ruleType: string;
+  ruleDescription: string;
+  eligibilityCriteria: string;
 }
 
 const formSchema = z.object({
@@ -40,7 +38,9 @@ type FormValues = z.infer<typeof formSchema>;
 export default function RuleBuilderForm({ onRuleAdded, existingRule }: { onRuleAdded?: () => void; existingRule?: RebateRule | null }) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { firestore, user } = useFirebase();
+  const { db, userId } = useLocalStorage();
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -50,66 +50,71 @@ export default function RuleBuilderForm({ onRuleAdded, existingRule }: { onRuleA
     if (existingRule) {
       form.reset(existingRule);
     } else {
-        form.reset({
-            contractId: '',
-            ruleType: '',
-            ruleDescription: '',
-            eligibilityCriteria: '',
-        });
+      form.reset({
+        contractId: '',
+        ruleType: '',
+        ruleDescription: '',
+        eligibilityCriteria: '',
+      });
     }
   }, [existingRule, form]);
 
-  const contractsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'contracts'), where('vendorId', '==', user.uid));
-  }, [firestore, user]);
-
-  const { data: contracts, isLoading: isLoadingContracts } = useCollection<Contract>(contractsQuery);
+  useEffect(() => {
+    async function fetchContracts() {
+      setIsLoadingContracts(true);
+      try {
+        const data = await db.contracts
+          .where('vendor_id')
+          .equals(userId)
+          .toArray();
+        setContracts(data.map(c => ({ id: c.id, name: c.name })));
+      } catch (error) {
+        console.error('Error fetching contracts:', error);
+      } finally {
+        setIsLoadingContracts(false);
+      }
+    }
+    fetchContracts();
+  }, [db, userId]);
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
-    if (!firestore || !user) {
-      toast({
-        title: 'Error',
-        description: 'Cannot save rule. Firebase not available or user not signed in.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
     setIsLoading(true);
     try {
-        if (existingRule) {
-            // Update existing rule
-            const ruleRef = doc(firestore, 'rebate_rules', existingRule.id);
-            await setDoc(ruleRef, data, { merge: true });
-             toast({
-                title: 'Success',
-                description: 'Rebate rule updated successfully!',
-             });
-        } else {
-            // Create new rule
-            const rulesCollection = collection(firestore, 'rebate_rules');
-            const newRule = {
-                id: uuidv4(),
-                ...data
-            };
-            
-            await addDoc(rulesCollection, newRule)
-                .catch(async (serverError) => {
-                    const { FirestorePermissionError } = await import('@/firebase/errors');
-                    const { errorEmitter } = await import('@/firebase/error-emitter');
-                    const permissionError = new FirestorePermissionError({
-                        path: rulesCollection.path,
-                        operation: 'create',
-                        requestResourceData: newRule,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
-            toast({
-                title: 'Success',
-                description: 'New rebate rule created successfully!',
-            });
-        }
+      const ruleData = {
+        contract_id: data.contractId,
+        type: data.ruleType,
+        description: data.ruleDescription,
+        criteria: { text: data.eligibilityCriteria },
+        name: `Rule for ${contracts.find(c => c.id === data.contractId)?.name || 'Contract'}`,
+        status: 'active' as const,
+        source: 'manual' as const,
+      };
+
+      if (existingRule) {
+        // Update existing rule
+        await db.rebate_rules.update(existingRule.id, {
+          ...ruleData,
+          updated_at: getCurrentTimestamp(),
+        });
+
+        toast({
+          title: 'Success',
+          description: 'Rebate rule updated successfully!',
+        });
+      } else {
+        // Create new rule
+        await db.rebate_rules.add({
+          id: generateId(),
+          ...ruleData,
+          created_at: getCurrentTimestamp(),
+          updated_at: getCurrentTimestamp(),
+        });
+
+        toast({
+          title: 'Success',
+          description: 'New rebate rule created successfully!',
+        });
+      }
 
       form.reset();
       onRuleAdded?.();
@@ -201,10 +206,10 @@ export default function RuleBuilderForm({ onRuleAdded, existingRule }: { onRuleA
           )}
         />
         <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {existingRule ? 'Save Changes' : 'Create Rule'}
-            </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {existingRule ? 'Save Changes' : 'Create Rule'}
+          </Button>
         </div>
       </form>
     </Form>

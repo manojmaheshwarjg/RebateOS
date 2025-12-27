@@ -128,324 +128,144 @@ export default function FileBuilderPage() {
   const totalSelectedAmount = selectedClaims.reduce((sum, c) => sum + c.amount, 0);
 
   const handleBuildFile = async () => {
-    if (selectedClaims.length === 0) {
-      toast({
-        title: 'No Claims Selected',
-        description: 'Please select at least one claim to build the file.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    if (selectedClaims.length === 0) return;
     setBuilding(true);
     setBuildProgress(0);
-
     for (let i = 0; i <= 100; i += 10) {
       await new Promise(resolve => setTimeout(resolve, 150));
       setBuildProgress(i);
     }
-
     setBuilding(false);
     toast({
       title: 'File Built Successfully',
-      description: `Created ${selectedVendor || 'rebates'}_submission.${fileFormat} with ${selectedClaims.length} claims.`,
+      description: `Created submission file with ${selectedClaims.length} claims.`,
     });
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'acknowledged':
-        return (
-          <Badge className="bg-green-100 text-green-800">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Acknowledged
-          </Badge>
-        );
-      case 'submitted':
-        return (
-          <Badge className="bg-blue-100 text-blue-800">
-            <Clock className="mr-1 h-3 w-3" />
-            Submitted
-          </Badge>
-        );
-      case 'partial':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">
-            Partial Accept
-          </Badge>
-        );
-      case 'rejected':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="mr-1 h-3 w-3" />
-            Rejected
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case 'acknowledged': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Acknowledged</Badge>;
+      case 'submitted': return <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">Submitted</Badge>;
+      case 'partial': return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Partial</Badge>;
+      case 'rejected': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">Rejected</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">File Builder</h1>
-        <p className="text-muted-foreground">
-          Build and submit rebate claim files to vendors
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 font-body text-slate-900 pb-20">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 leading-none mb-1">File Builder</h1>
+            <p className="text-sm text-slate-500">Compile and export vendor claim submissions.</p>
+          </div>
+          <Button onClick={handleBuildFile} disabled={building || selectedClaims.length === 0} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9">
+            {building ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Build & Send
+          </Button>
+        </div>
+      </header>
 
-      <Tabs defaultValue="builder" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="builder">Build File</TabsTrigger>
-          <TabsTrigger value="history">Submission History</TabsTrigger>
-          <TabsTrigger value="templates">Vendor Templates</TabsTrigger>
-        </TabsList>
+      <main className="container mx-auto px-6 py-8">
+        {/* KPI Grid */}
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Selected Claims</span>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{selectedClaims.length}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Total Value</span>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">${totalSelectedAmount.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md border-slate-200 shadow-none">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Settings2 className="h-4 w-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-500">Format</span>
+              </div>
+              <p className="text-2xl font-bold text-slate-900 uppercase">{fileFormat}</p>
+            </CardContent>
+          </Card>
+        </div>
 
-        <TabsContent value="builder" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Selected Claims</span>
-                </div>
-                <p className="text-2xl font-bold">{selectedClaims.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Total Amount</span>
-                </div>
-                <p className="text-2xl font-bold">${totalSelectedAmount.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Format</span>
-                </div>
-                <p className="text-2xl font-bold uppercase">{fileFormat}</p>
-              </CardContent>
-            </Card>
+        <Tabs defaultValue="builder" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <TabsList className="bg-slate-100 p-1 border border-slate-200">
+              <TabsTrigger value="builder" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Build File</TabsTrigger>
+              <TabsTrigger value="history" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">History</TabsTrigger>
+              <TabsTrigger value="templates" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Templates</TabsTrigger>
+            </TabsList>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>File Configuration</CardTitle>
-              <CardDescription>Configure the output file settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+          <TabsContent value="builder" className="space-y-6">
+            <Card className="rounded-md border-slate-200 shadow-none">
+              <CardHeader>
+                <CardTitle>Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Vendor</Label>
-                  <Select value={selectedVendor} onValueChange={setSelectedVendor}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Vendors" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Vendors</SelectItem>
-                      <SelectItem value="Pfizer">Pfizer</SelectItem>
-                      <SelectItem value="McKesson">McKesson</SelectItem>
-                      <SelectItem value="Cardinal">Cardinal Health</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Select value={selectedVendor} onValueChange={setSelectedVendor}><SelectTrigger className="border-slate-300"><SelectValue placeholder="All Vendors" /></SelectTrigger><SelectContent><SelectItem value="">All</SelectItem><SelectItem value="Pfizer">Pfizer</SelectItem></SelectContent></Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>File Format</Label>
-                  <Select value={fileFormat} onValueChange={setFileFormat}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="csv">CSV</SelectItem>
-                      <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
-                      <SelectItem value="xml">XML</SelectItem>
-                      <SelectItem value="edi">EDI 867</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Format</Label>
+                  <Select value={fileFormat} onValueChange={setFileFormat}><SelectTrigger className="border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="csv">CSV</SelectItem><SelectItem value="xlsx">Excel</SelectItem></SelectContent></Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Submission Period</Label>
-                  <Select defaultValue="q1-2024">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="q1-2024">Q1 2024</SelectItem>
-                      <SelectItem value="q4-2023">Q4 2023</SelectItem>
-                      <SelectItem value="q3-2023">Q3 2023</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Period</Label>
+                  <Select defaultValue="q1-2024"><SelectTrigger className="border-slate-300"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="q1-2024">Q1 2024</SelectItem></SelectContent></Select>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Claim Selection</CardTitle>
-                  <CardDescription>Select claims to include in the submission file</CardDescription>
-                </div>
-                <Button variant="outline" onClick={selectAll}>
-                  {selectedClaims.length === claims.filter(c => c.status === 'ready').length
-                    ? 'Deselect All'
-                    : 'Select All Ready'}
+            <div className="rounded-md border border-slate-200 bg-white overflow-hidden shadow-none">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+                <h3 className="font-semibold text-sm text-slate-900">Available Claims</h3>
+                <Button variant="outline" size="sm" onClick={selectAll} className="h-8 bg-white border-slate-300">
+                  {selectedClaims.length === claims.filter(c => c.status === 'ready').length ? 'Deselect All' : 'Select All Ready'}
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
                     <TableHead className="w-12"></TableHead>
-                    <TableHead>Claim ID</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Claim ID</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Product</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Qty</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider text-right">Amount</TableHead>
+                    <TableHead className="h-10 text-xs font-bold text-slate-700 uppercase tracking-wider">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {claims
-                    .filter(c => !selectedVendor || c.vendor === selectedVendor)
-                    .map((claim) => (
-                      <TableRow key={claim.id} className={claim.status !== 'ready' ? 'opacity-50' : ''}>
-                        <TableCell>
-                          <Checkbox
-                            checked={claim.selected}
-                            onCheckedChange={() => toggleClaimSelection(claim.id)}
-                            disabled={claim.status !== 'ready'}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono">{claim.claimId}</TableCell>
-                        <TableCell>{claim.vendor}</TableCell>
-                        <TableCell>{claim.product}</TableCell>
-                        <TableCell className="text-right">{claim.quantity}</TableCell>
-                        <TableCell className="text-right">${claim.amount.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Badge variant={claim.status === 'ready' ? 'default' : 'secondary'}>
-                            {claim.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-
-              {building && (
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Building file...</span>
-                    <span>{buildProgress}%</span>
-                  </div>
-                  <Progress value={buildProgress} />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Preview
-                </Button>
-                <Button onClick={handleBuildFile} disabled={building || selectedClaims.length === 0}>
-                  {building ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Building...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Build & Download
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Submission History</CardTitle>
-              <CardDescription>Track submitted files and vendor acknowledgements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead className="text-right">Claims</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {submissionHistory.map((submission) => (
-                    <TableRow key={submission.id}>
-                      <TableCell className="font-mono text-sm">{submission.fileName}</TableCell>
-                      <TableCell>{submission.vendor}</TableCell>
-                      <TableCell className="text-right">{submission.claimsCount}</TableCell>
-                      <TableCell className="text-right">${submission.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell>{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>
-                      <TableCell>{getStatusBadge(submission.status)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                  {claims.filter(c => !selectedVendor || c.vendor === selectedVendor).map((claim) => (
+                    <TableRow key={claim.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                      <TableCell><Checkbox checked={claim.selected} onCheckedChange={() => toggleClaimSelection(claim.id)} disabled={claim.status !== 'ready'} /></TableCell>
+                      <TableCell className="font-mono text-sm">{claim.claimId}</TableCell>
+                      <TableCell className="text-sm">{claim.vendor}</TableCell>
+                      <TableCell className="text-sm">{claim.product}</TableCell>
+                      <TableCell className="text-right text-sm">{claim.quantity}</TableCell>
+                      <TableCell className="text-right text-sm">${claim.amount.toFixed(2)}</TableCell>
+                      <TableCell><Badge variant={claim.status === 'ready' ? 'default' : 'secondary'} className={claim.status === 'ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{claim.status}</Badge></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="templates" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Vendor File Templates</CardTitle>
-              <CardDescription>Configure vendor-specific file formats and schemas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">Pfizer</h4>
-                  <p className="text-sm text-muted-foreground mb-2">CSV format with custom headers</p>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">McKesson</h4>
-                  <p className="text-sm text-muted-foreground mb-2">EDI 867 format</p>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">Cardinal Health</h4>
-                  <p className="text-sm text-muted-foreground mb-2">Excel with pivot tables</p>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium">AmerisourceBergen</h4>
-                  <p className="text-sm text-muted-foreground mb-2">XML schema v2.1</p>
-                  <Button variant="outline" size="sm">Configure</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }
